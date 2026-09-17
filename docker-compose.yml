@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: mainstage-score-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mainstage
+      POSTGRES_PASSWORD: mainstage_dev_password
+      POSTGRES_DB: mainstage_score
+    ports:
+      - "5432:5432"
+    volumes:
+      - mainstage_score_data:/var/lib/postgresql/data
+
+volumes:
+  mainstage_score_data:

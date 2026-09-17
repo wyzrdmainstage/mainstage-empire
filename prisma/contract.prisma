@@ -1,0 +1,14 @@
+// use prisma-next
+
+types {
+  Uuid = String @db.Uuid
+}
+
+model User {
+  id          Uuid     @id @default(uuid())
+  email       String   @unique
+  displayName String
+  createdAt   DateTime @default(now())
+
+  @@map("users")
+}

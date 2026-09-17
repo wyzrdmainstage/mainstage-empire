@@ -1,0 +1,218 @@
+// use prisma-next
+
+enum UserRole {
+  ADMIN
+  ORGANIZER
+  JUDGE
+}
+
+enum CompetitionStatus {
+  DRAFT
+  READY
+  LIVE
+  JUDGING_COMPLETE
+  FINALIZED
+  ARCHIVED
+}
+
+enum ScorecardStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum AuthTokenType {
+  INVITATION
+  LOGIN
+}
+
+enum TiebreakStatus {
+  JUDGES_VOTING
+  ORGANIZER_VOTING
+  RESOLVED
+}
+
+enum TiebreakVoterType {
+  JUDGE
+  ORGANIZER
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  roles                 UserRoleAssignment[]
+  organizedCompetitions Competition[]      @relation("CompetitionOrganizer")
+  judgeAssignments      CompetitionJudge[]
+  authTokens            AuthToken[]
+  sessions              Session[]
+  tiebreakVotes         TiebreakVote[]
+}
+
+model UserRoleAssignment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  role      UserRole
+  createdAt TimestamptzString @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, role])
+  @@index([role])
+}
+
+model Competition {
+  id           Int                @id @default(autoincrement())
+  name         String
+  venueName    String
+  date         TimestamptzString
+  description  String?
+  status       CompetitionStatus  @default(DRAFT)
+  organizerId  Int
+  createdAt    TimestamptzString  @default(now())
+  updatedAt    temporal.updatedAtString()
+
+  organizer  User               @relation("CompetitionOrganizer", fields: [organizerId], references: [id])
+  judges     CompetitionJudge[]
+  performers Performer[]
+  tiebreaks  Tiebreak[]
+
+  @@index([organizerId])
+}
+
+model CompetitionJudge {
+  id            Int      @id @default(autoincrement())
+  competitionId Int
+  judgeId       Int
+  createdAt     TimestamptzString @default(now())
+
+  competition Competition @relation(fields: [competitionId], references: [id])
+  judge       User        @relation(fields: [judgeId], references: [id])
+  scorecards  Scorecard[]
+
+  @@unique([competitionId, judgeId])
+  @@index([judgeId])
+}
+
+model Performer {
+  id                  Int      @id @default(autoincrement())
+  competitionId       Int
+  artistName          String
+  songCount           Int?
+  supporterCount      Int      @default(0)
+  excludedFromResults Boolean  @default(false)
+  performanceOrder    Int
+  createdAt           TimestamptzString @default(now())
+  updatedAt           temporal.updatedAtString()
+
+  competition     Competition         @relation(fields: [competitionId], references: [id])
+  scorecards      Scorecard[]
+  tiebreakEntries TiebreakPerformer[]
+  tiebreakVotes   TiebreakVote[]
+  tiebreakWins    Tiebreak[]          @relation("TiebreakWinner")
+
+  @@index([competitionId, performanceOrder])
+}
+
+model Scorecard {
+  id                Int             @id @default(autoincrement())
+  performerId       Int
+  judgeAssignmentId Int
+
+  presentation Int?
+  vocals       Int?
+  lyrics       Int?
+  energy       Int?
+  quality      Int?
+  starFactor   Int?
+
+  notes        String?
+  status       ScorecardStatus @default(DRAFT)
+  submittedAt  TimestamptzString?
+  createdAt    TimestamptzString @default(now())
+  updatedAt    temporal.updatedAtString()
+
+  performer       Performer        @relation(fields: [performerId], references: [id])
+  judgeAssignment CompetitionJudge @relation(fields: [judgeAssignmentId], references: [id])
+
+  @@unique([performerId, judgeAssignmentId])
+  @@index([performerId])
+}
+
+model AuthToken {
+  id         Int            @id @default(autoincrement())
+  userId     Int
+  type       AuthTokenType
+  tokenHash  String         @unique
+  expiresAt  TimestamptzString
+  usedAt     TimestamptzString?
+  createdAt  TimestamptzString @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+model Session {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  tokenHash String         @unique
+  expiresAt TimestamptzString
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Tiebreak {
+  id                Int               @id @default(autoincrement())
+  competitionId     Int
+  placement         Int
+  status            TiebreakStatus    @default(JUDGES_VOTING)
+  winnerPerformerId Int?
+  createdAt         TimestamptzString @default(now())
+  updatedAt         temporal.updatedAtString()
+
+  competition     Competition         @relation(fields: [competitionId], references: [id])
+  winnerPerformer Performer?          @relation("TiebreakWinner", fields: [winnerPerformerId], references: [id])
+  performers      TiebreakPerformer[]
+  votes            TiebreakVote[]
+
+  @@unique([competitionId, placement])
+  @@index([competitionId])
+  @@index([winnerPerformerId])
+}
+
+model TiebreakPerformer {
+  id          Int @id @default(autoincrement())
+  tiebreakId  Int
+  performerId Int
+
+  tiebreak  Tiebreak  @relation(fields: [tiebreakId], references: [id])
+  performer Performer @relation(fields: [performerId], references: [id])
+
+  @@unique([tiebreakId, performerId])
+  @@index([performerId])
+}
+
+model TiebreakVote {
+  id          Int               @id @default(autoincrement())
+  tiebreakId  Int
+  userId      Int
+  performerId Int
+  voterType   TiebreakVoterType
+  createdAt   TimestamptzString @default(now())
+
+  tiebreak  Tiebreak  @relation(fields: [tiebreakId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  performer Performer @relation(fields: [performerId], references: [id])
+
+  @@unique([tiebreakId, userId, voterType])
+  @@index([performerId])
+}
