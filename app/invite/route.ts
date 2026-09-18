@@ -121,15 +121,16 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies();
 
-  cookieStore.set({
-    name: SESSION_COOKIE,
-    value: session.token,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: session.expiresAt,
-  });
+cookieStore.set({
+  name: "mainstage_session",
+  value: session.token,
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+  maxAge: 60 * 60 * 24,
+  expires: session.expiresAt,
+});
 
   if (competitionId !== null) {
     return NextResponse.redirect(

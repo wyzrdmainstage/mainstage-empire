@@ -103,15 +103,16 @@ export async function POST(request: Request) {
       },
     });
 
-    response.cookies.set({
-      name: SESSION_COOKIE,
-      value: sessionToken,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: expiresAt,
-    });
+response.cookies.set({
+  name: SESSION_COOKIE,
+  value: sessionToken,
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/",
+  maxAge: 60 * 60 * 24,
+  expires: expiresAt,
+});
 
     return response;
   } catch (error) {
