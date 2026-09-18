@@ -6,6 +6,7 @@ import {
 } from "@/src/auth";
 import { db } from "@/src/prisma/db";
 import nodemailer from "nodemailer";
+import { normalizeEmail } from "@/src/utils/email";
 
 type UserRole = "ADMIN" | "ORGANIZER" | "JUDGE";
 
@@ -196,7 +197,7 @@ export async function POST(request: Request) {
 
     const email =
       typeof body.email === "string"
-        ? body.email.trim().toLowerCase()
+        ? normalizeEmail(body.email)
         : "";
 
     const requestedRoles = Array.isArray(body.roles)

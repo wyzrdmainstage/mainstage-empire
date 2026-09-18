@@ -6,6 +6,7 @@ import {
   hashToken,
 } from "@/src/auth";
 import { sendJudgeInvitationEmail } from "@/src/email/mail";
+import { normalizeEmail } from "@/src/utils/email";
 
 type RouteContext = {
   params: Promise<{
@@ -135,8 +136,8 @@ export async function POST(
 
   const email =
     typeof body.email === "string"
-      ? body.email.trim().toLowerCase()
-      : "";
+     ? normalizeEmail(body.email)
+     : "";
 
   if (!name) {
     return NextResponse.json(

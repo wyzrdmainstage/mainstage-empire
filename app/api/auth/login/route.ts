@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { generateToken, hashToken } from "@/src/auth";
 import { sendLoginEmail } from "@/src/email/mail";
+import { normalizeEmail } from "@/src/utils/email";
 
 export async function POST(request: Request) {
 
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
 
     const user = await db.orm.public.User.first({
       email: normalizedEmail,
