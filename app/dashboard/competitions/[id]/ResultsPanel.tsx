@@ -8,6 +8,7 @@ type ResultsPanelProps = {
     | "LIVE"
     | "JUDGING_COMPLETE"
     | "FINALIZED"
+    | "CANCELED"
     | "ARCHIVED";
 };
 
@@ -15,6 +16,15 @@ export default async function ResultsPanel({
   competitionId,
   status,
 }: ResultsPanelProps) {
+  if (status === "CANCELED") {
+    return (
+      <div className="mt-6 rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-4 text-sm text-red-400">
+        This competition was canceled. Official results are not
+        available for this competition.
+      </div>
+    );
+  }
+
   if (
     status !== "JUDGING_COMPLETE" &&
     status !== "FINALIZED" &&

@@ -90,6 +90,10 @@
                 "value": "FINALIZED"
               },
               {
+                "name": "CANCELED",
+                "value": "CANCELED"
+              },
+              {
                 "name": "ARCHIVED",
                 "value": "ARCHIVED"
               }
@@ -262,6 +266,27 @@
           },
           "Competition": {
             "fields": {
+              "canceledAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "canceledBy": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "cancellationReason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -396,6 +421,15 @@
             },
             "storage": {
               "fields": {
+                "canceledAt": {
+                  "column": "canceledAt"
+                },
+                "canceledBy": {
+                  "column": "canceledBy"
+                },
+                "cancellationReason": {
+                  "column": "cancellationReason"
+                },
                 "createdAt": {
                   "column": "createdAt"
                 },
@@ -1674,12 +1708,27 @@
             "competition": {
               "checks": [
                 {
-                  "expression": "\"status\" IN ('DRAFT', 'READY', 'LIVE', 'JUDGING_COMPLETE', 'FINALIZED', 'ARCHIVED')",
-                  "name": "competition_status_check_187fec9f",
+                  "expression": "\"status\" IN ('DRAFT', 'READY', 'LIVE', 'JUDGING_COMPLETE', 'FINALIZED', 'CANCELED', 'ARCHIVED')",
+                  "name": "competition_status_check_f12e016b",
                   "prefix": "competition_status_check"
                 }
               ],
               "columns": {
+                "canceledAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "canceledBy": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "cancellationReason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "createdAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "default": {
@@ -1763,6 +1812,14 @@
                 }
               ],
               "indexes": [
+                {
+                  "columns": [
+                    "canceledBy"
+                  ],
+                  "name": "competition_canceledBy_idx_f1186120",
+                  "prefix": "competition_canceledBy_idx",
+                  "unique": false
+                },
                 {
                   "columns": [
                     "organizerId"
@@ -2762,6 +2819,7 @@
                 "LIVE",
                 "JUDGING_COMPLETE",
                 "FINALIZED",
+                "CANCELED",
                 "ARCHIVED"
               ]
             },
@@ -2801,7 +2859,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ad01d8143530971441359a605c19d4ce2568cd6a45d387ab81d0ad163fb9378b"
+    "storageHash": "3f3006de9a6af6cd4abcc74c302888dce49e025fb3322e436b6e6fbd5c33443b"
   },
   "execution": {
     "executionHash": "12c72fc7099de83d4c2472d49db0b13fecb4d0e30b6ccce62c464114dd461697",

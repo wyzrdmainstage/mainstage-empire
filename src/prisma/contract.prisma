@@ -12,6 +12,7 @@ enum CompetitionStatus {
   LIVE
   JUDGING_COMPLETE
   FINALIZED
+  CANCELED
   ARCHIVED
 }
 
@@ -64,15 +65,18 @@ model UserRoleAssignment {
 }
 
 model Competition {
-  id           Int                @id @default(autoincrement())
-  name         String
-  venueName    String
-  date         TimestamptzString
-  description  String?
-  status       CompetitionStatus  @default(DRAFT)
-  organizerId  Int
-  createdAt    TimestamptzString  @default(now())
-  updatedAt    temporal.updatedAtString()
+  id                Int                @id @default(autoincrement())
+  name              String
+  venueName         String
+  date              TimestamptzString
+  description       String?
+  status            CompetitionStatus  @default(DRAFT)
+  organizerId       Int
+  canceledAt        TimestamptzString?
+  canceledBy        Int?
+  cancellationReason String?
+  createdAt         TimestamptzString  @default(now())
+  updatedAt         temporal.updatedAtString()
 
   organizer  User               @relation("CompetitionOrganizer", fields: [organizerId], references: [id])
   judges     CompetitionJudge[]
@@ -80,6 +84,7 @@ model Competition {
   tiebreaks  Tiebreak[]
 
   @@index([organizerId])
+  @@index([canceledBy])
 }
 
 model CompetitionJudge {

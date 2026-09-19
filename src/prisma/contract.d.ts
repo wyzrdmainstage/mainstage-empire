@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'ad01d8143530971441359a605c19d4ce2568cd6a45d387ab81d0ad163fb9378b'>;
+  StorageHashBase<'3f3006de9a6af6cd4abcc74c302888dce49e025fb3322e436b6e6fbd5c33443b'>;
 export type ExecutionHash =
   ExecutionHashBase<'12c72fc7099de83d4c2472d49db0b13fecb4d0e30b6ccce62c464114dd461697'>;
 export type ProfileHash =
@@ -256,8 +256,12 @@ export type FieldOutputTypes = {
       readonly venueName: CodecTypes['pg/text@1']['output'];
       readonly date: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
-      readonly status: 'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'ARCHIVED';
+      readonly status:
+        'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'CANCELED' | 'ARCHIVED';
       readonly organizerId: CodecTypes['pg/int4@1']['output'];
+      readonly canceledAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly canceledBy: CodecTypes['pg/int4@1']['output'] | null;
+      readonly cancellationReason: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
@@ -356,8 +360,12 @@ export type FieldInputTypes = {
       readonly venueName: CodecTypes['pg/text@1']['input'];
       readonly date: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
-      readonly status: 'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'ARCHIVED';
+      readonly status:
+        'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'CANCELED' | 'ARCHIVED';
       readonly organizerId: CodecTypes['pg/int4@1']['input'];
+      readonly canceledAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly canceledBy: CodecTypes['pg/int4@1']['input'] | null;
+      readonly cancellationReason: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
@@ -451,13 +459,17 @@ export type StorageColumnTypes = {
       readonly userId: CodecTypes['pg/int4@1']['output'];
     };
     readonly competition: {
+      readonly canceledAt: CodecTypes['pg/timestamptz-string@1']['output'] | null;
+      readonly canceledBy: CodecTypes['pg/int4@1']['output'] | null;
+      readonly cancellationReason: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly date: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly organizerId: CodecTypes['pg/int4@1']['output'];
-      readonly status: 'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'ARCHIVED';
+      readonly status:
+        'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'CANCELED' | 'ARCHIVED';
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly venueName: CodecTypes['pg/text@1']['output'];
     };
@@ -551,13 +563,17 @@ export type StorageColumnInputTypes = {
       readonly userId: CodecTypes['pg/int4@1']['input'];
     };
     readonly competition: {
+      readonly canceledAt: CodecTypes['pg/timestamptz-string@1']['input'] | null;
+      readonly canceledBy: CodecTypes['pg/int4@1']['input'] | null;
+      readonly cancellationReason: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly date: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly organizerId: CodecTypes['pg/int4@1']['input'];
-      readonly status: 'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'ARCHIVED';
+      readonly status:
+        'DRAFT' | 'READY' | 'LIVE' | 'JUDGING_COMPLETE' | 'FINALIZED' | 'CANCELED' | 'ARCHIVED';
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly venueName: CodecTypes['pg/text@1']['input'];
     };
@@ -782,6 +798,21 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
                 };
+                readonly canceledAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: true;
+                };
+                readonly canceledBy: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly cancellationReason: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-string@1';
@@ -801,6 +832,12 @@ type ContractBase = Omit<
                   readonly name: 'competition_organizerId_idx_17a44ca9';
                   readonly prefix: 'competition_organizerId_idx';
                   readonly columns: readonly ['organizerId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'competition_canceledBy_idx_f1186120';
+                  readonly prefix: 'competition_canceledBy_idx';
+                  readonly columns: readonly ['canceledBy'];
                   readonly unique: false;
                 },
               ];
@@ -1545,6 +1582,7 @@ type ContractBase = Omit<
                 'LIVE',
                 'JUDGING_COMPLETE',
                 'FINALIZED',
+                'CANCELED',
                 'ARCHIVED',
               ];
             };
@@ -1703,6 +1741,21 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
+              readonly canceledAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+              readonly canceledBy: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly cancellationReason: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -1772,6 +1825,9 @@ type ContractBase = Omit<
                 readonly description: { readonly column: 'description' };
                 readonly status: { readonly column: 'status' };
                 readonly organizerId: { readonly column: 'organizerId' };
+                readonly canceledAt: { readonly column: 'canceledAt' };
+                readonly canceledBy: { readonly column: 'canceledBy' };
+                readonly cancellationReason: { readonly column: 'cancellationReason' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
@@ -2523,6 +2579,7 @@ type ContractBase = Omit<
               { readonly name: 'LIVE'; readonly value: 'LIVE' },
               { readonly name: 'JUDGING_COMPLETE'; readonly value: 'JUDGING_COMPLETE' },
               { readonly name: 'FINALIZED'; readonly value: 'FINALIZED' },
+              { readonly name: 'CANCELED'; readonly value: 'CANCELED' },
               { readonly name: 'ARCHIVED'; readonly value: 'ARCHIVED' },
             ];
           };

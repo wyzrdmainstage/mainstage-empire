@@ -213,7 +213,7 @@ export async function PATCH(
   request: Request,
   { params }: RouteContext
 ) {
-  await requireRole([
+  const user = await requireRole([
     "ADMIN",
     "ORGANIZER",
   ]);
@@ -243,6 +243,7 @@ export async function PATCH(
     "LIVE",
     "JUDGING_COMPLETE",
     "FINALIZED",
+    "CANCELED",
     "ARCHIVED",
   ] as const;
 
@@ -269,18 +270,40 @@ export async function PATCH(
     );
   }
 
+  /*
+   * Cancellation is permanent through the normal UI.
+   * Once canceled, the only allowed lifecycle change
+   * is CANCELED -> ARCHIVED.
+   */
   const transitions: Record<
     string,
     string[]
   > = {
-    DRAFT: ["READY"],
-    READY: ["DRAFT", "LIVE"],
-    LIVE: ["JUDGING_COMPLETE"],
+    DRAFT: [
+      "READY",
+      "CANCELED",
+    ],
+    READY: [
+      "DRAFT",
+      "LIVE",
+      "CANCELED",
+    ],
+    LIVE: [
+      "JUDGING_COMPLETE",
+      "CANCELED",
+    ],
     JUDGING_COMPLETE: [
       "LIVE",
       "FINALIZED",
+      "CANCELED",
     ],
-    FINALIZED: ["ARCHIVED"],
+    FINALIZED: [
+      "ARCHIVED",
+      "CANCELED",
+    ],
+    CANCELED: [
+      "ARCHIVED",
+    ],
     ARCHIVED: [],
   };
 
@@ -297,6 +320,62 @@ export async function PATCH(
     );
   }
 
+  /*
+   * Cancellation requires an explicit reason.
+   * This is intentionally enforced server-side so the
+   * requirement cannot be bypassed by the UI.
+   */
+  if (requestedStatus === "CANCELED") {
+    const cancellationReason =
+      typeof body?.cancellationReason ===
+      "string"
+        ? body.cancellationReason.trim()
+        : "";
+
+    if (cancellationReason.length < 10) {
+      return NextResponse.json(
+        {
+          error:
+            "A cancellation reason of at least 10 characters is required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const updated =
+      await db.orm.public.Competition.where({
+        id: competitionId,
+      }).update({
+        status: "CANCELED",
+        canceledAt:
+          new Date().toISOString(),
+        canceledBy: user.id,
+        cancellationReason,
+        updatedAt:
+          new Date().toISOString(),
+      });
+
+    if (!updated) {
+      return NextResponse.json(
+        {
+          error:
+            "Competition could not be canceled.",
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      competition: updated,
+    });
+  }
+
+  /*
+   * A canceled competition can only be archived.
+   * No judging, performer, supporter, judge assignment,
+   * or tiebreak activity should be possible after this point.
+   */
   const performers =
     await db.orm.public.Performer.where({
       competitionId,

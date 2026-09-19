@@ -73,6 +73,40 @@ export default async function PerformerScorecardPage({
     notFound();
   }
 
+if (competition.status === "CANCELED") {
+  return (
+    <main className="min-h-screen bg-black text-white">
+      <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-6 py-10">
+        <div className="w-full rounded-2xl border border-red-900/50 bg-red-950/20 p-8 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-red-400">
+            MAINSTAGE EMPIRE
+          </p>
+
+          <h1 className="mt-4 text-3xl font-bold">
+            Competition Canceled
+          </h1>
+
+          <p className="mt-3 text-lg text-white">
+            {competition.name}
+          </p>
+
+          <p className="mx-auto mt-5 max-w-xl text-zinc-400">
+            This competition has been canceled. Scoring is no longer
+            available for this competition.
+          </p>
+
+          <Link
+            href={`/dashboard/competitions/${competitionId}?view=judge`}
+            className="mt-8 inline-block rounded-lg bg-amber-400 px-5 py-3 font-semibold text-black transition hover:bg-amber-300"
+          >
+            Back to Performance Queue
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+
   const existingScorecard =
     await db.orm.public.Scorecard.first({
       performerId: performer.id,

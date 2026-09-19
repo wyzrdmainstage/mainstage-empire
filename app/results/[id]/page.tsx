@@ -13,10 +13,12 @@ function statusLabel(status: string) {
   switch (status) {
     case "JUDGING_COMPLETE":
       return "Judging Complete";
-    case "FINALIZED":
-      return "Official Results";
-    case "ARCHIVED":
-      return "Archived Results";
+case "FINALIZED":
+  return "Official Results";
+case "CANCELED":
+  return "Canceled";
+case "ARCHIVED":
+  return "Archived Results";
     default:
       return status;
   }
@@ -40,6 +42,52 @@ export default async function ResultsPage({
   if (!competition) {
     notFound();
   }
+
+if (competition.status === "CANCELED") {
+  return (
+    <main className="min-h-screen bg-black text-white">
+      <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-6 py-10">
+        <div className="w-full rounded-2xl border border-red-900/50 bg-red-950/20 p-8 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-red-400">
+            MAINSTAGE EMPIRE
+          </p>
+
+          <h1 className="mt-4 text-3xl font-bold">
+            Competition Canceled
+          </h1>
+
+          <p className="mt-3 text-lg text-white">
+            {competition.name}
+          </p>
+
+          <p className="mx-auto mt-5 max-w-xl text-zinc-400">
+            This competition was canceled. Official results
+            are not available for this competition.
+          </p>
+
+          {competition.cancellationReason && (
+            <div className="mx-auto mt-6 max-w-xl rounded-xl border border-zinc-800 bg-black/40 p-5 text-left">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Cancellation Reason
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-zinc-300">
+                {competition.cancellationReason}
+              </p>
+            </div>
+          )}
+
+          <Link
+            href="/dashboard/competitions"
+            className="mt-8 inline-block rounded-lg bg-amber-400 px-5 py-3 font-semibold text-black transition hover:bg-amber-300"
+          >
+            Back to Competitions
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
 
   const resultsPublished =
     competition.status === "JUDGING_COMPLETE" ||

@@ -27,6 +27,8 @@ function statusLabel(status: string) {
       return "Judging Complete";
     case "FINALIZED":
       return "Finalized";
+    case "CANCELED":
+      return "Canceled";
     case "ARCHIVED":
       return "Archived";
     default:
@@ -58,9 +60,10 @@ export default async function CompetitionPage({
     notFound();
   }
 
-  const isLocked =
-    competition.status === "FINALIZED" ||
-    competition.status === "ARCHIVED";
+const isLocked =
+  competition.status === "FINALIZED" ||
+  competition.status === "CANCELED" ||
+  competition.status === "ARCHIVED";
 
   const isAdmin =
     user.roles.includes("ADMIN");
@@ -223,18 +226,22 @@ export default async function CompetitionPage({
                             </div>
                           </div>
 
-                          {submitted ? (
-                            <div className="rounded-lg border border-emerald-900 bg-emerald-950/20 px-4 py-3 text-sm font-medium text-emerald-400">
-                              Scorecard Submitted
-                            </div>
-                          ) : (
-                            <Link
-                              href={`/dashboard/competitions/${competitionId}/performers/${performer.id}`}
-                              className="rounded-lg bg-amber-400 px-5 py-3 text-center font-semibold text-black transition hover:bg-amber-300"
-                            >
-                              Score Performance
-                            </Link>
-                          )}
+{competition.status === "CANCELED" ? (
+  <div className="rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-3 text-sm font-medium text-red-400">
+    Competition Canceled
+  </div>
+) : submitted ? (
+  <div className="rounded-lg border border-emerald-900 bg-emerald-950/20 px-4 py-3 text-sm font-medium text-emerald-400">
+    Scorecard Submitted
+  </div>
+) : (
+  <Link
+    href={`/dashboard/competitions/${competitionId}/performers/${performer.id}`}
+    className="rounded-lg bg-amber-400 px-5 py-3 text-center font-semibold text-black transition hover:bg-amber-300"
+  >
+    Score Performance
+  </Link>
+)}
                         </div>
                       </div>
                     );
@@ -330,6 +337,27 @@ export default async function CompetitionPage({
               </span>
             </div>
           </header>
+
+{competition.status === "CANCELED" && (
+  <div className="mt-6 rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
+    <p className="text-sm font-semibold uppercase tracking-wider text-red-400">
+      Competition Canceled
+    </p>
+
+    <p className="mt-3 text-sm leading-6 text-zinc-300">
+      {competition.cancellationReason}
+    </p>
+
+    {competition.canceledAt && (
+      <p className="mt-3 text-xs text-zinc-500">
+        Canceled on{" "}
+        {new Date(
+          competition.canceledAt
+        ).toLocaleString()}
+      </p>
+    )}
+  </div>
+)}
 
           <section className="mt-10 grid gap-6 md:grid-cols-2">
             <Link
@@ -484,7 +512,7 @@ export default async function CompetitionPage({
             </div>
           </section>
 
-          {isAssignedJudge && (
+          {isAssignedJudge && competition.status !== "CANCELED" && (
             <section className="mt-6">
               <Link
                 href={`/dashboard/competitions/${competitionId}?view=judge`}

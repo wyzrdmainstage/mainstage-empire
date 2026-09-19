@@ -19,13 +19,18 @@ function parseCompetitionId(value: string) {
 }
 
 function isLocked(status: string) {
-  return status === "FINALIZED" || status === "ARCHIVED";
+  return (
+    status === "FINALIZED" ||
+    status === "CANCELED" ||
+    status === "ARCHIVED"
+  );
 }
 
 function isScoringLocked(status: string) {
   return (
     status === "LIVE" ||
     status === "JUDGING_COMPLETE" ||
+    status === "CANCELED" ||
     status === "FINALIZED" ||
     status === "ARCHIVED"
   );
@@ -67,7 +72,11 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
-  if (competition.status === "FINALIZED" || competition.status === "ARCHIVED") {
+  if (
+  competition.status === "FINALIZED" ||
+  competition.status === "CANCELED" ||
+  competition.status === "ARCHIVED"
+) {
     return NextResponse.json(
       { error: "Performers cannot be added after the competition is finalized." },
       { status: 400 }
@@ -323,11 +332,12 @@ export async function PATCH(request: Request, { params }: Params) {
    * ------------------------------------------------------------
    */
   if (action === "updateSongCount") {
-    if (
-      competition.status === "JUDGING_COMPLETE" ||
-      competition.status === "FINALIZED" ||
-      competition.status === "ARCHIVED"
-    ) {
+if (
+  competition.status === "JUDGING_COMPLETE" ||
+  competition.status === "FINALIZED" ||
+  competition.status === "CANCELED" ||
+  competition.status === "ARCHIVED"
+) {
       return NextResponse.json(
         {
           error:
@@ -502,19 +512,19 @@ export async function DELETE(
     );
   }
 
-  if (
-    competition.status === "JUDGING_COMPLETE" ||
-    competition.status === "FINALIZED" ||
-    competition.status === "ARCHIVED"
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "Performers cannot be removed after judging has started.",
-      },
-      { status: 400 }
-    );
-  }
+if (
+  competition.status === "CANCELED" ||
+  competition.status === "FINALIZED" ||
+  competition.status === "ARCHIVED"
+) {
+  return NextResponse.json(
+    {
+      error:
+        "Performers cannot be removed after the competition is canceled or finalized.",
+    },
+    { status: 400 }
+  );
+}
 
   let body: {
     performerId?: number;

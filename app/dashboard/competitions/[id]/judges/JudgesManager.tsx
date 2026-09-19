@@ -31,9 +31,10 @@ export default function JudgesManager({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const changesLocked =
-    competitionStatus === "FINALIZED" ||
-    competitionStatus === "ARCHIVED";
+const changesLocked =
+  competitionStatus === "CANCELED" ||
+  competitionStatus === "FINALIZED" ||
+  competitionStatus === "ARCHIVED";
 
   async function addJudge(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,6 +136,18 @@ export default function JudgesManager({
 
   return (
     <div className="space-y-10">
+{competitionStatus === "CANCELED" && (
+  <div className="rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
+    <h2 className="text-xl font-semibold text-red-400">
+      Competition Canceled
+    </h2>
+
+    <p className="mt-2 text-sm text-zinc-400">
+      This competition is canceled. Judge assignments and
+      judging activity are locked.
+    </p>
+  </div>
+)}
       {!changesLocked && (
         <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
           <div className="mb-6">
@@ -221,10 +234,10 @@ export default function JudgesManager({
             Judge Assignments Locked
           </h2>
 
-          <p className="mt-2 text-sm text-zinc-400">
-            Judges cannot be added or removed after the competition
-            has been finalized or archived.
-          </p>
+<p className="mt-2 text-sm text-zinc-400">
+  Judges cannot be added or removed after the competition
+  has been canceled, finalized, or archived.
+</p>
         </div>
       )}
 

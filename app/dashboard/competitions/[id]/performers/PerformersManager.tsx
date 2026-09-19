@@ -39,14 +39,16 @@ export default function PerformersManager({
   const [editingSongCount, setEditingSongCount] =
     useState("");
 
-  const changesLocked =
-    competitionStatus === "FINALIZED" ||
-    competitionStatus === "ARCHIVED";
+const changesLocked =
+  competitionStatus === "CANCELED" ||
+  competitionStatus === "FINALIZED" ||
+  competitionStatus === "ARCHIVED";
 
-  const songCountLocked =
-    competitionStatus === "JUDGING_COMPLETE" ||
-    competitionStatus === "FINALIZED" ||
-    competitionStatus === "ARCHIVED";
+const songCountLocked =
+  competitionStatus === "JUDGING_COMPLETE" ||
+  competitionStatus === "CANCELED" ||
+  competitionStatus === "FINALIZED" ||
+  competitionStatus === "ARCHIVED";
 
   const canManageResults =
     isAdmin &&
@@ -103,11 +105,15 @@ export default function PerformersManager({
     }
   }
 
-  async function movePerformer(
-    performerId: number,
-    direction: "up" | "down"
-  ) {
-    setError("");
+async function movePerformer(
+  performerId: number,
+  direction: "up" | "down"
+) {
+  if (changesLocked) {
+    return;
+  }
+
+  setError("");
     setSaving(true);
 
     try {
@@ -286,9 +292,9 @@ export default function PerformersManager({
       (item) => item.id === performerId
     );
 
-    if (!performer) {
-      return;
-    }
+if (!performer || changesLocked) {
+  return;
+}
 
     const confirmed = window.confirm(
       `Remove "${performer.artistName}" from the lineup?`
@@ -398,6 +404,19 @@ export default function PerformersManager({
 
   return (
     <div className="space-y-10">
+{competitionStatus === "CANCELED" && (
+  <div className="rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
+    <h2 className="text-xl font-semibold text-red-400">
+      Competition Canceled
+    </h2>
+
+    <p className="mt-2 text-sm text-zinc-400">
+      This competition is canceled. Performer lineup changes,
+      supporter updates, reordering, and other competition
+      activity are locked.
+    </p>
+  </div>
+)}
       {!changesLocked && (
         <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
           <div className="mb-6">

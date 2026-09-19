@@ -13,9 +13,11 @@ function statusLabel(status: string) {
     case "JUDGING_COMPLETE":
       return "Judging Complete";
     case "FINALIZED":
-      return "Finalized";
-    case "ARCHIVED":
-      return "Archived";
+  return "Finalized";
+case "CANCELED":
+  return "Canceled";
+case "ARCHIVED":
+  return "Archived";
     default:
       return status;
   }
@@ -38,6 +40,7 @@ function judgeActivePriority(status: string) {
 
 function isCompletedStatus(status: string) {
   return (
+    status === "CANCELED" ||
     status === "FINALIZED" ||
     status === "ARCHIVED"
   );
@@ -221,15 +224,18 @@ export default async function CompetitionsPage() {
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
                   competition.status ===
-                  "LIVE"
-                    ? "border-emerald-900 bg-emerald-950/40 text-emerald-400"
-                    : competition.status ===
-                        "FINALIZED"
-                      ? "border-blue-900 bg-blue-950/40 text-blue-400"
-                      : competition.status ===
-                          "ARCHIVED"
-                        ? "border-zinc-700 bg-zinc-900 text-zinc-400"
-                        : "border-amber-900 bg-amber-950/40 text-amber-400"
+"LIVE"
+  ? "border-emerald-900 bg-emerald-950/40 text-emerald-400"
+  : competition.status ===
+      "FINALIZED"
+    ? "border-blue-900 bg-blue-950/40 text-blue-400"
+    : competition.status ===
+        "CANCELED"
+      ? "border-red-900 bg-red-950/40 text-red-400"
+      : competition.status ===
+          "ARCHIVED"
+        ? "border-zinc-700 bg-zinc-900 text-zinc-400"
+        : "border-amber-900 bg-amber-950/40 text-amber-400"
                 }`}
               >
                 {statusLabel(

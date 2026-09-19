@@ -114,14 +114,15 @@ export async function POST(
     );
   }
 
-  if (
-    competition.status === "FINALIZED" ||
-    competition.status === "ARCHIVED"
-  ) {
+if (
+  competition.status === "FINALIZED" ||
+  competition.status === "CANCELED" ||
+  competition.status === "ARCHIVED"
+) {
     return NextResponse.json(
       {
         error:
-          "Judges cannot be changed after the competition is finalized or archived.",
+          "Judges cannot be changed after the competition is canceled, finalized, or archived.",
       },
       { status: 400 }
     );
@@ -312,14 +313,15 @@ export async function DELETE(
     );
   }
 
-  if (
-    competition.status === "FINALIZED" ||
-    competition.status === "ARCHIVED"
-  ) {
+if (
+  competition.status === "FINALIZED" ||
+  competition.status === "CANCELED" ||
+  competition.status === "ARCHIVED"
+) {
     return NextResponse.json(
       {
         error:
-          "Judges cannot be changed after the competition is finalized or archived.",
+          "Judges cannot be changed after the competition is canceled, finalized, or archived.",
       },
       { status: 400 }
     );
