@@ -60,6 +60,13 @@ export default async function CompetitionPage({
     notFound();
   }
 
+const canceledByUser =
+  competition.canceledBy
+    ? await db.orm.public.User.first({
+        id: competition.canceledBy,
+      })
+    : null;
+
 const isLocked =
   competition.status === "FINALIZED" ||
   competition.status === "CANCELED" ||
@@ -342,9 +349,9 @@ const isLocked =
   (competition.status === "ARCHIVED" &&
     competition.cancellationReason)) && (
   <div className="mt-6 rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
-<p className="text-sm font-semibold uppercase tracking-wider text-red-400">
-  Cancellation Record
-</p>
+    <p className="text-sm font-semibold uppercase tracking-wider text-red-400">
+      Cancellation Record
+    </p>
 
     <p className="mt-3 text-sm leading-6 text-zinc-300">
       {competition.cancellationReason}
@@ -356,6 +363,15 @@ const isLocked =
         {new Date(
           competition.canceledAt
         ).toLocaleString()}
+      </p>
+    )}
+
+    {canceledByUser && (
+      <p className="mt-2 text-xs text-zinc-500">
+        Canceled by{" "}
+        <span className="text-zinc-400">
+          {canceledByUser.name || canceledByUser.email}
+        </span>
       </p>
     )}
   </div>
