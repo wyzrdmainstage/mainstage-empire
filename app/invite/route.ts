@@ -10,11 +10,14 @@ import {
 export async function GET(request: Request) {
   const url = new URL(request.url);
 
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || url.origin;
+
   const token = url.searchParams.get("token");
 
   if (!token) {
     return NextResponse.redirect(
-      new URL("/invite/invalid", request.url)
+      new URL("/invite/invalid", appUrl)
     );
   }
 
@@ -26,25 +29,25 @@ export async function GET(request: Request) {
 
   if (!authToken) {
     return NextResponse.redirect(
-      new URL("/invite/invalid", request.url)
+      new URL("/invite/invalid", appUrl)
     );
   }
 
   if (authToken.type !== "INVITATION") {
     return NextResponse.redirect(
-      new URL("/invite/invalid", request.url)
+      new URL("/invite/invalid", appUrl)
     );
   }
 
   if (authToken.usedAt) {
     return NextResponse.redirect(
-      new URL("/invite/used", request.url)
+      new URL("/invite/used", appUrl)
     );
   }
 
   if (new Date(authToken.expiresAt) <= new Date()) {
     return NextResponse.redirect(
-      new URL("/invite/expired", request.url)
+      new URL("/invite/expired", appUrl)
     );
   }
 
@@ -54,7 +57,7 @@ export async function GET(request: Request) {
 
   if (!user) {
     return NextResponse.redirect(
-      new URL("/invite/invalid", request.url)
+      new URL("/invite/invalid", appUrl)
     );
   }
 
@@ -77,7 +80,7 @@ export async function GET(request: Request) {
 
     if (!Number.isInteger(parsedCompetitionId)) {
       return NextResponse.redirect(
-        new URL("/invite/invalid", request.url)
+        new URL("/invite/invalid", appUrl)
       );
     }
 
@@ -89,7 +92,7 @@ export async function GET(request: Request) {
 
     if (!assignment) {
       return NextResponse.redirect(
-        new URL("/invite/invalid", request.url)
+        new URL("/invite/invalid", appUrl)
       );
     }
 
@@ -113,7 +116,7 @@ export async function GET(request: Request) {
 
   if (!claimedToken) {
     return NextResponse.redirect(
-      new URL("/invite/used", request.url)
+      new URL("/invite/used", appUrl)
     );
   }
 
@@ -121,27 +124,27 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies();
 
-cookieStore.set({
-  name: "mainstage_session",
-  value: session.token,
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: "/",
-  maxAge: 60 * 60 * 24,
-  expires: session.expiresAt,
-});
+  cookieStore.set({
+    name: SESSION_COOKIE,
+    value: session.token,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24,
+    expires: session.expiresAt,
+  });
 
   if (competitionId !== null) {
     return NextResponse.redirect(
       new URL(
         `/dashboard/competitions/${competitionId}`,
-        request.url
+        appUrl
       )
     );
   }
 
   return NextResponse.redirect(
-    new URL("/dashboard", request.url)
+    new URL("/dashboard", appUrl)
   );
 }
