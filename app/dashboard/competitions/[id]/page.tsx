@@ -338,11 +338,13 @@ const isLocked =
             </div>
           </header>
 
-{competition.status === "CANCELED" && (
+{(competition.status === "CANCELED" ||
+  (competition.status === "ARCHIVED" &&
+    competition.cancellationReason)) && (
   <div className="mt-6 rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
-    <p className="text-sm font-semibold uppercase tracking-wider text-red-400">
-      Competition Canceled
-    </p>
+<p className="text-sm font-semibold uppercase tracking-wider text-red-400">
+  Cancellation Record
+</p>
 
     <p className="mt-3 text-sm leading-6 text-zinc-300">
       {competition.cancellationReason}
