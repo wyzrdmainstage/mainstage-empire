@@ -19,6 +19,7 @@ type ScorecardFormProps = {
   competitionId: number;
   performerId: number;
   existingScorecard: Scorecard | null;
+  excludedFromResults: boolean;
 };
 
 const categories = [
@@ -66,6 +67,7 @@ export default function ScorecardForm({
   competitionId,
   performerId,
   existingScorecard,
+  excludedFromResults,
 }: ScorecardFormProps) {
   const router = useRouter();
 
@@ -102,6 +104,10 @@ export default function ScorecardForm({
     category: CategoryKey,
     score: number
   ) {
+    if (excludedFromResults) {
+      return;
+    }
+
     setScores((current) => ({
       ...current,
       [category]: score,
@@ -109,6 +115,13 @@ export default function ScorecardForm({
   }
 
     async function handleSubmit() {
+    if (excludedFromResults) {
+      setError(
+        "You have been excluded from this competition's results and cannot submit scorecards."
+      );
+      return;
+    }
+
     if (!allScored) {
       setError("Please score every category before submitting.");
       return;
@@ -163,6 +176,33 @@ export default function ScorecardForm({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (excludedFromResults) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-red-900/60 bg-red-950/20 p-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-red-400">
+            Judge Status
+          </p>
+
+          <h2 className="mt-3 text-2xl font-semibold text-white">
+            Excluded from Results
+          </h2>
+
+          <p className="mt-3 leading-7 text-zinc-400">
+            You have been excluded from this competition's official results.
+            Your previous scorecards have been retained, but you cannot
+            submit or modify scores while excluded.
+          </p>
+
+          <p className="mt-4 text-sm text-zinc-500">
+            If you are restored to the judging panel, your existing
+            scorecards will become active again.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

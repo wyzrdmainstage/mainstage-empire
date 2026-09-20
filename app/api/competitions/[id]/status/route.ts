@@ -27,10 +27,21 @@ async function calculateResults(competitionId: number) {
       competitionId,
     }).all();
 
+  /*
+   * Judges excluded from results retain their scorecards
+   * in the database, but their scores do not contribute
+   * to official result calculations.
+   */
+  const eligibleAssignments =
+    assignments.filter(
+      (assignment) =>
+        !assignment.excludedFromResults
+    );
+
   const results = await Promise.all(
     performers.map(async (performer) => {
       const scorecards = await Promise.all(
-        assignments.map((assignment) =>
+        eligibleAssignments.map((assignment) =>
           db.orm.public.Scorecard.first({
             performerId: performer.id,
             judgeAssignmentId: assignment.id,
@@ -386,6 +397,17 @@ export async function PATCH(
       competitionId,
     }).all();
 
+  /*
+   * Judges excluded from results remain assigned and their
+   * data remains intact, but they are not considered active
+   * judges for competition requirements.
+   */
+  const activeJudges =
+    judges.filter(
+      (judge) =>
+        !judge.excludedFromResults
+    );
+
   if (
     requestedStatus === "READY" ||
     requestedStatus === "LIVE"
@@ -415,15 +437,34 @@ export async function PATCH(
     requestedStatus ===
     "JUDGING_COMPLETE"
   ) {
+    /*
+     * At least one judge must remain active.
+     *
+     * If every judge has been excluded from results,
+     * the competition cannot be considered complete.
+     */
+    if (activeJudges.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Judging cannot be completed because all judges are excluded from results. Restore at least one judge before completing judging.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Only active judges count toward judging completion.
+     */
     const expected =
       performers.length *
-      judges.length;
+      activeJudges.length;
 
     const scorecards =
       await Promise.all(
         performers.flatMap(
           (performer) =>
-            judges.map(
+            activeJudges.map(
               (judge) =>
                 db.orm.public.Scorecard.first(
                   {
@@ -464,6 +505,20 @@ export async function PATCH(
         {
           error:
             "Competition must have at least one performer.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * Make sure at least one judge is still contributing
+     * to the official results before finalization.
+     */
+    if (activeJudges.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Competition cannot be finalized because all judges are excluded from results. Restore at least one judge before finalizing.",
         },
         { status: 400 }
       );

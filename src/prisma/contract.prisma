@@ -88,10 +88,11 @@ model Competition {
 }
 
 model CompetitionJudge {
-  id            Int      @id @default(autoincrement())
-  competitionId Int
-  judgeId       Int
-  createdAt     TimestamptzString @default(now())
+  id                  Int      @id @default(autoincrement())
+  competitionId       Int
+  judgeId             Int
+  createdAt            TimestamptzString @default(now())
+  excludedFromResults Boolean  @default(false)
 
   competition Competition @relation(fields: [competitionId], references: [id])
   judge       User        @relation(fields: [judgeId], references: [id])

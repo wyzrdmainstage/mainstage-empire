@@ -62,10 +62,16 @@ async function getFinalScores(competitionId: number) {
       competitionId,
     }).all();
 
+  const activeAssignments =
+    assignments.filter(
+      (assignment) =>
+        !assignment.excludedFromResults
+    );
+
   return Promise.all(
     performers.map(async (performer) => {
       const scorecards = await Promise.all(
-        assignments.map((assignment) =>
+        activeAssignments.map((assignment) =>
           db.orm.public.Scorecard.first({
             performerId: performer.id,
             judgeAssignmentId: assignment.id,
@@ -312,10 +318,39 @@ export async function GET(
       }
     ).all();
 
+  const allJudgeAssignments =
+    await db.orm.public.CompetitionJudge.where({
+      competitionId,
+    }).all();
+
+  const activeJudgeIds =
+    new Set(
+      allJudgeAssignments
+        .filter(
+          (assignment) =>
+            !assignment.excludedFromResults
+        )
+        .map(
+          (assignment) =>
+            assignment.judgeId
+        )
+    );
+
+  const activeVotes =
+    votes.filter((vote) => {
+      if (vote.voterType !== "JUDGE") {
+        return true;
+      }
+
+      return activeJudgeIds.has(
+        vote.userId
+      );
+    });
+
   const voteTotals = performers.map(
     (performer) => ({
       performerId: performer.id,
-      votes: votes.filter(
+      votes: activeVotes.filter(
         (vote) =>
           vote.performerId ===
           performer.id
@@ -340,12 +375,15 @@ export async function GET(
       performers,
       hasVoted:
         currentVoterType !== null &&
-        votes.some(
+        activeVotes.some(
           (vote) =>
             vote.userId === user.id &&
             vote.voterType === currentVoterType
         ),
-      voteCount: votes.length,
+      voteCount: activeVotes.filter(
+        (vote) =>
+          vote.voterType === currentVoterType
+      ).length,
 
       /*
        * Judges never see vote totals.
@@ -502,6 +540,19 @@ export async function POST(
     tiebreak.status === "ORGANIZER_VOTING";
 
   if (
+    shouldVoteAsJudge &&
+    judgeAssignment?.excludedFromResults
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "You have been excluded from this competition's results and cannot vote in tiebreaks.",
+      },
+      { status: 403 }
+    );
+  }
+
+  if (
     !shouldVoteAsJudge &&
     !shouldVoteAsOrganizer
   ) {
@@ -646,12 +697,43 @@ export async function POST(
       }
     ).all();
 
+  const activeJudgeAssignments =
+    judgeAssignments.filter(
+      (assignment) =>
+        !assignment.excludedFromResults
+    );
+
+  const activeJudgeIdsForVotes =
+    new Set(
+      activeJudgeAssignments.map(
+        (assignment) =>
+          assignment.judgeId
+      )
+    );
+
+  const activeJudgeVotes =
+    judgeVotes.filter((vote) =>
+      activeJudgeIdsForVotes.has(
+        vote.userId
+      )
+    );
+
+  if (activeJudgeAssignments.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "No eligible judges are available for this tiebreak.",
+      },
+      { status: 409 }
+    );
+  }
+
   /*
-   * Wait until every assigned judge has voted.
+   * Wait until every active judge has voted.
    */
   if (
-    judgeVotes.length <
-    judgeAssignments.length
+    activeJudgeVotes.length <
+    activeJudgeAssignments.length
   ) {
     return NextResponse.json({
       success: true,
@@ -659,9 +741,9 @@ export async function POST(
       status:
         "JUDGES_VOTING",
       votesReceived:
-        judgeVotes.length,
+        activeJudgeVotes.length,
       votesRequired:
-        judgeAssignments.length,
+        activeJudgeAssignments.length,
       message:
         "Tiebreak vote recorded.",
     });
@@ -678,7 +760,7 @@ export async function POST(
         performerId:
           performer.id,
         votes:
-          judgeVotes.filter(
+          activeJudgeVotes.filter(
             (vote) =>
               vote.performerId ===
               performer.id

@@ -59,6 +59,17 @@ export default async function ResultsPanel({
     }).all();
 
   /*
+   * Judges excluded from results retain all of their
+   * scorecards in the database, but their scores do not
+   * contribute to official results.
+   */
+  const eligibleAssignments =
+    assignments.filter(
+      (assignment) =>
+        !assignment.excludedFromResults
+    );
+
+  /*
    * Load all tiebreaks for this competition.
    */
   const tiebreaks =
@@ -140,13 +151,21 @@ export default async function ResultsPanel({
 
   /*
    * Calculate each eligible performer's final score.
+   *
+   * IMPORTANT:
+   * Only judges who are currently included in results
+   * contribute to the calculation.
+   *
+   * Excluded judges' existing scorecards remain untouched
+   * in the database and become active again automatically
+   * if the judge is restored.
    */
   const results = await Promise.all(
     eligiblePerformers.map(
       async (performer) => {
         const scorecards =
           await Promise.all(
-            assignments.map(
+            eligibleAssignments.map(
               (assignment) =>
                 db.orm.public.Scorecard.first({
                   performerId:
@@ -577,7 +596,8 @@ export default async function ResultsPanel({
 
       <p className="mt-4 text-xs text-zinc-600">
         Final Score is the average of the submitted
-        judges' totals. Maximum score: 60 points.
+        judges&apos; totals from judges included in
+        the results. Maximum score: 60 points.
         Tied scores are resolved only through the
         official tiebreak process.
       </p>

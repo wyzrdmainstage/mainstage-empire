@@ -118,15 +118,16 @@ export default async function JudgesPage({
         ).length;
 
       return {
-        assignmentId: assignment.id,
-        judgeId: assignment.judgeId,
-        email: judge?.email ?? "",
-        name: judge?.name ?? null,
-        submittedScorecards,
-        incompleteScorecards,
-        missingScorecards,
-        performerStatuses,
-      };
+  assignmentId: assignment.id,
+  judgeId: assignment.judgeId,
+  email: judge?.email ?? "",
+  name: judge?.name ?? null,
+  submittedScorecards,
+  incompleteScorecards,
+  missingScorecards,
+  performerStatuses,
+  excludedFromResults: assignment.excludedFromResults,
+};
     })
   );
 

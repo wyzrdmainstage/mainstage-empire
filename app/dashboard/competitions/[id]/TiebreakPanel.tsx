@@ -26,6 +26,7 @@ type TiebreakData = {
 type TiebreakPanelProps = {
   competitionId: number;
   role: "ORGANIZER" | "JUDGE";
+  excludedFromResults?: boolean;
 };
 
 function statusLabel(status: TiebreakData["status"]) {
@@ -44,6 +45,7 @@ function statusLabel(status: TiebreakData["status"]) {
 export default function TiebreakPanel({
   competitionId,
   role,
+  excludedFromResults = false,
 }: TiebreakPanelProps) {
   const router = useRouter();
 
@@ -94,7 +96,12 @@ export default function TiebreakPanel({
   }, [loadTiebreak]);
 
   async function castVote(performerId: number) {
-    if (!tiebreak || voting || tiebreak.hasVoted) {
+    if (
+      !tiebreak ||
+      voting ||
+      tiebreak.hasVoted ||
+      (role === "JUDGE" && excludedFromResults)
+    ) {
       return;
     }
 
@@ -158,12 +165,6 @@ export default function TiebreakPanel({
     return null;
   }
 
-  const canVote =
-    (role === "JUDGE" &&
-      tiebreak.status === "JUDGES_VOTING") ||
-    (role === "ORGANIZER" &&
-      tiebreak.status === "ORGANIZER_VOTING");
-
   const winner =
     tiebreak.winnerPerformerId !== null
       ? tiebreak.performers.find(
@@ -200,7 +201,23 @@ export default function TiebreakPanel({
             should receive this placement.
           </p>
 
-          {tiebreak.hasVoted ? (
+          {excludedFromResults && role === "JUDGE" ? (
+            <div className="mt-6 rounded-xl border border-red-900/60 bg-red-950/20 p-5">
+              <p className="font-semibold text-red-400">
+                Excluded from Results
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-zinc-400">
+                You have been excluded from this competition's official
+                results and cannot participate in this tiebreak vote.
+              </p>
+
+              <p className="mt-2 text-xs text-zinc-500">
+                Your previous vote, if any, has been retained but does
+                not count while you are excluded.
+              </p>
+            </div>
+          ) : tiebreak.hasVoted ? (
             <div className="mt-6 rounded-xl border border-emerald-900 bg-emerald-950/20 p-4">
               <p className="font-medium text-emerald-400">
                 Your tiebreak vote has been recorded.
@@ -210,7 +227,7 @@ export default function TiebreakPanel({
                 Waiting for the remaining judges.
               </p>
             </div>
-          ) : role === "JUDGE" ? (
+          ) : role === "JUDGE" && !excludedFromResults ? (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {tiebreak.performers.map(
                 (performer) => (

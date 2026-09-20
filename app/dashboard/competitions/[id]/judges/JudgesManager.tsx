@@ -26,6 +26,7 @@ type Judge = {
   incompleteScorecards: number;
   missingScorecards: number;
   performerStatuses: PerformerStatus[];
+  excludedFromResults: boolean;
 };
 
 type JudgesManagerProps = {
@@ -163,6 +164,68 @@ export default function JudgesManager({
     } catch {
       setError(
         "Something went wrong while removing the judge."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleJudgeResults(
+    assignmentId: number,
+    currentlyExcluded: boolean,
+    name: string | null
+  ) {
+    const action = currentlyExcluded
+      ? "restoreFromResults"
+      : "excludeFromResults";
+
+    const displayName =
+      name || "this judge";
+
+    const confirmed =
+      window.confirm(
+        currentlyExcluded
+          ? `Restore ${displayName} to competition results?`
+          : `Exclude ${displayName} from competition results? Their scores will be retained, but will no longer count toward results or voting.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setSaving(true);
+
+    try {
+      const response = await fetch(
+        `/api/competitions/${competitionId}/judges`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            assignmentId,
+            action,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            "Unable to update judge result eligibility."
+        );
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(
+        "Something went wrong while updating judge result eligibility."
       );
     } finally {
       setSaving(false);
@@ -322,19 +385,38 @@ export default function JudgesManager({
               return (
                 <div
                   key={judge.assignmentId}
-                  className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950"
+                  className={`overflow-hidden rounded-2xl border bg-zinc-950 ${
+                    judge.excludedFromResults
+                      ? "border-red-900/70"
+                      : "border-zinc-800"
+                  }`}
                 >
                   <div className="p-5">
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold text-white">
-                          {judge.name ||
-                            "Unnamed Judge"}
-                        </h3>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-lg font-semibold text-white">
+                            {judge.name ||
+                              "Unnamed Judge"}
+                          </h3>
+
+                          {judge.excludedFromResults && (
+                            <span className="rounded-full border border-red-900 bg-red-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-400">
+                              Excluded from Results
+                            </span>
+                          )}
+                        </div>
 
                         <p className="mt-1 text-sm text-zinc-500">
                           {judge.email}
                         </p>
+
+                        {judge.excludedFromResults && (
+                          <p className="mt-2 text-sm text-red-400/80">
+                            Scores are retained but do not
+                            count toward results or voting.
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -376,22 +458,45 @@ export default function JudgesManager({
                         </button>
 
                         {!changesLocked && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeJudge(
-                                judge.assignmentId,
-                                judge.name
-                              )
-                            }
-                            disabled={
-                              saving ||
-                              submitted > 0
-                            }
-                            className="rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-400 transition hover:border-red-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
-                          >
-                            Remove
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleJudgeResults(
+                                  judge.assignmentId,
+                                  judge.excludedFromResults,
+                                  judge.name
+                                )
+                              }
+                              disabled={saving}
+                              className={`rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                judge.excludedFromResults
+                                  ? "border-emerald-900 text-emerald-400 hover:border-emerald-500 hover:text-emerald-300"
+                                  : "border-amber-900 text-amber-400 hover:border-amber-500 hover:text-amber-300"
+                              }`}
+                            >
+                              {judge.excludedFromResults
+                                ? "Restore to Results"
+                                : "Exclude from Results"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeJudge(
+                                  judge.assignmentId,
+                                  judge.name
+                                )
+                              }
+                              disabled={
+                                saving ||
+                                submitted > 0
+                              }
+                              className="rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-400 transition hover:border-red-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              Remove
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

@@ -107,6 +107,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Excluded judges retain their existing scorecards,
+    // but cannot submit or modify scores while excluded.
+    if (assignment.excludedFromResults) {
+      return NextResponse.json(
+        {
+          error:
+            "You have been excluded from this competition's results and cannot submit scorecards.",
+        },
+        { status: 403 }
+      );
+    }
+
     const competition =
       await db.orm.public.Competition.first({
         id: competitionId,

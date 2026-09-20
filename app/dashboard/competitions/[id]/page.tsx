@@ -91,6 +91,9 @@ const isLocked =
   const isAssignedJudge =
     Boolean(judgeAssignment);
 
+  const isJudgeExcluded =
+    judgeAssignment?.excludedFromResults ?? false;
+
   /*
    * A multi-role user can explicitly enter their
    * judge view with ?view=judge.
@@ -172,6 +175,7 @@ const isLocked =
             <TiebreakPanel
               competitionId={competition.id}
               role="JUDGE"
+              excludedFromResults={isJudgeExcluded}
             />
           )}
 
@@ -534,7 +538,11 @@ const isLocked =
             <section className="mt-6">
               <Link
                 href={`/dashboard/competitions/${competitionId}?view=judge`}
-                className="block rounded-2xl border border-amber-500/30 bg-amber-400/5 p-6 transition hover:border-amber-400/60"
+                className={`block rounded-2xl border p-6 transition ${
+                isJudgeExcluded
+                  ? "border-red-900/60 bg-red-950/20"
+                  : "border-amber-500/30 bg-amber-400/5 hover:border-amber-400/60"
+              }`}
               >
                 <p className="text-sm font-semibold uppercase tracking-wider text-amber-400">
                   Judge Assignment
@@ -544,15 +552,32 @@ const isLocked =
                   Open Your Judge View
                 </h2>
 
-                <p className="mt-2 text-sm text-zinc-400">
-                  You are assigned as a judge for this
-                  competition. Use your assigned performer
-                  queue to submit scorecards.
-                </p>
+                {isJudgeExcluded ? (
+                  <>
+                    <p className="mt-2 text-sm text-red-400">
+                      You have been excluded from this competition's
+                      official results. Your previous scores are retained,
+                      but you cannot submit additional scores or vote in
+                      tiebreaks while excluded.
+                    </p>
 
-                <div className="mt-4 text-sm font-medium text-amber-400">
-                  Open Judge Queue &rarr;
-                </div>
+                    <div className="mt-4 text-sm font-medium text-red-400">
+                      Excluded from Results
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm text-zinc-400">
+                      You are assigned as a judge for this
+                      competition. Use your assigned performer
+                      queue to submit scorecards.
+                    </p>
+
+                    <div className="mt-4 text-sm font-medium text-amber-400">
+                      Open Judge Queue &rarr;
+                    </div>
+                  </>
+                )}
               </Link>
             </section>
           )}

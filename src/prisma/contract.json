@@ -478,6 +478,13 @@
                   "kind": "scalar"
                 }
               },
+              "excludedFromResults": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -547,6 +554,9 @@
                 },
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "excludedFromResults": {
+                  "column": "excludedFromResults"
                 },
                 "id": {
                   "column": "id"
@@ -1852,6 +1862,15 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "excludedFromResults": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "id": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -2859,7 +2878,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "3f3006de9a6af6cd4abcc74c302888dce49e025fb3322e436b6e6fbd5c33443b"
+    "storageHash": "2a5d6c9481da149f47ab7a842d6b1c137839a7501ad54d07e2f162766c7ae21a"
   },
   "execution": {
     "executionHash": "12c72fc7099de83d4c2472d49db0b13fecb4d0e30b6ccce62c464114dd461697",

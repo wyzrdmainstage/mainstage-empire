@@ -75,16 +75,109 @@ export async function GET(
         ).length;
 
       return {
-        assignmentId: assignment.id,
-        judgeId: assignment.judgeId,
-        email: judge?.email ?? "",
-        name: judge?.name ?? null,
-        submittedScorecards,
-      };
+  assignmentId: assignment.id,
+  judgeId: assignment.judgeId,
+  email: judge?.email ?? "",
+  name: judge?.name ?? null,
+  submittedScorecards,
+  excludedFromResults: assignment.excludedFromResults,
+};
     })
   );
 
   return NextResponse.json({ judges });
+}
+
+// PATCH — Exclude or restore a judge from competition results
+export async function PATCH(
+  request: Request,
+  { params }: RouteContext
+) {
+  const user = await requireRole(["ADMIN", "ORGANIZER"]);
+
+  const { id } = await params;
+  const competitionId = Number(id);
+
+  if (!Number.isInteger(competitionId)) {
+    return NextResponse.json(
+      { error: "Invalid competition ID." },
+      { status: 400 }
+    );
+  }
+
+const competition = await getCompetitionForManager(
+  competitionId
+);
+
+  if (!competition) {
+    return NextResponse.json(
+      { error: "Competition not found." },
+      { status: 404 }
+    );
+  }
+
+  if (
+    competition.status === "FINALIZED" ||
+    competition.status === "ARCHIVED"
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Judge result eligibility cannot be changed after the competition is finalized or archived.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const body = await request.json();
+
+  const assignmentId = Number(body.assignmentId);
+  const action = body.action;
+
+  if (!Number.isInteger(assignmentId)) {
+    return NextResponse.json(
+      { error: "Invalid judge assignment ID." },
+      { status: 400 }
+    );
+  }
+
+  if (
+    action !== "excludeFromResults" &&
+    action !== "restoreFromResults"
+  ) {
+    return NextResponse.json(
+      { error: "Invalid judge result action." },
+      { status: 400 }
+    );
+  }
+
+  const assignment =
+    await db.orm.public.CompetitionJudge.first({
+      id: assignmentId,
+      competitionId,
+    });
+
+  if (!assignment) {
+    return NextResponse.json(
+      { error: "Judge assignment not found." },
+      { status: 404 }
+    );
+  }
+
+  const excludedFromResults =
+    action === "excludeFromResults";
+
+  await db.orm.public.CompetitionJudge.where({
+    id: assignment.id,
+  }).update({
+    excludedFromResults,
+  });
+
+  return NextResponse.json({
+    success: true,
+    assignmentId: assignment.id,
+    excludedFromResults,
+  });
 }
 
 // POST -- Assign a judge by name and email

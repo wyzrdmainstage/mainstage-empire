@@ -175,6 +175,7 @@ if (competition.status === "CANCELED") {
               competitionId={competitionId}
               performerId={performer.id}
               existingScorecard={existingScorecard}
+              excludedFromResults={assignment.excludedFromResults}
             />
           )}
         </section>
