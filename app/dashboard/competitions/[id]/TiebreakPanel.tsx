@@ -17,6 +17,11 @@ type TiebreakData = {
   performers: TiebreakPerformer[];
   hasVoted: boolean;
   voteCount: number;
+  judgeVotingStatus?: {
+    judges: Array<{ id: number; name: string; hasVoted: boolean }>;
+    votedCount: number;
+    eligibleCount: number;
+  };
   voteTotals: Array<{
     performerId: number;
     votes: number;
@@ -266,6 +271,25 @@ export default function TiebreakPanel({
               <p className="mt-1 text-sm text-zinc-500">
                 Votes received: {tiebreak.voteCount}
               </p>
+            </div>
+          )}
+          {tiebreak.judgeVotingStatus && (
+            <div className="mt-4 rounded-xl border border-zinc-800 bg-black p-4">
+              <h3 className="font-medium text-zinc-300">Judge Voting Status</h3>
+              <p className="mt-1 text-sm text-zinc-400" role="status">
+                {tiebreak.judgeVotingStatus.votedCount} of{" "}
+                {tiebreak.judgeVotingStatus.eligibleCount} judges have voted.
+              </p>
+              <ul className="mt-4 divide-y divide-zinc-800">
+                {tiebreak.judgeVotingStatus.judges.map((judge) => (
+                  <li key={judge.id} className="flex items-center justify-between gap-4 py-2 text-sm">
+                    <span className="min-w-0 break-words text-zinc-300">{judge.name}</span>
+                    <span className={`shrink-0 font-medium ${judge.hasVoted ? "text-emerald-400" : "text-amber-400"}`}>
+                      {judge.hasVoted ? "Voted" : "Waiting"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </>

@@ -365,6 +365,36 @@ export async function GET(
         ? "ORGANIZER"
         : null;
 
+  // Only expose participation, never a judge's ballot selection.
+  const judgeVotingStatus =
+    (isAdmin || isOrganizer) && tiebreak.status === "JUDGES_VOTING"
+      ? await (async () => {
+          const votedJudgeIds = new Set(
+            activeVotes
+              .filter((vote) => vote.voterType === "JUDGE")
+              .map((vote) => vote.userId)
+          );
+          const judges = await Promise.all(
+            [...activeJudgeIds].map(async (judgeId) => {
+              const judge = await db.orm.public.User.first({ id: judgeId });
+
+              return {
+                id: judgeId,
+                name: judge?.name ?? "Unknown Judge",
+                hasVoted: votedJudgeIds.has(judgeId),
+              };
+            })
+          );
+          judges.sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
+
+          return {
+            judges,
+            votedCount: judges.filter((judge) => judge.hasVoted).length,
+            eligibleCount: judges.length,
+          };
+        })()
+      : undefined;
+
   return NextResponse.json({
     tiebreak: {
       id: tiebreak.id,
@@ -373,6 +403,7 @@ export async function GET(
       winnerPerformerId:
         tiebreak.winnerPerformerId,
       performers,
+      ...(judgeVotingStatus ? { judgeVotingStatus } : {}),
       hasVoted:
         currentVoterType !== null &&
         activeVotes.some(
@@ -391,7 +422,7 @@ export async function GET(
        * when they need to make the final decision.
        */
       voteTotals:
-        isAdmin || isOrganizer
+        (isAdmin || isOrganizer) && tiebreak.status === "ORGANIZER_VOTING"
           ? voteTotals
           : [],
     },
