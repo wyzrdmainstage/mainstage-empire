@@ -13,7 +13,7 @@ type JudgesPageProps = {
 export default async function JudgesPage({
   params,
 }: JudgesPageProps) {
-  const user = await requireRole(["ADMIN", "ORGANIZER"]);
+  await requireRole(["ADMIN", "ORGANIZER"]);
 
   const { id } = await params;
   const competitionId = Number(id);
@@ -22,17 +22,25 @@ export default async function JudgesPage({
     notFound();
   }
 
-  const competition = await db.orm.public.Competition.first({
-    id: competitionId,
-  });
+  const competition =
+    await db.orm.public.Competition.first({
+      id: competitionId,
+    });
 
   if (!competition) {
     notFound();
   }
 
-  const performers = await db.orm.public.Performer.where({
-    competitionId,
-  }).all();
+  const performers =
+    await db.orm.public.Performer.where({
+      competitionId,
+    }).all();
+
+  const sortedPerformers = [...performers].sort(
+    (a, b) =>
+      a.performanceOrder -
+      b.performanceOrder
+  );
 
   const assignments =
     await db.orm.public.CompetitionJudge.where({
@@ -41,23 +49,83 @@ export default async function JudgesPage({
 
   const judges = await Promise.all(
     assignments.map(async (assignment) => {
-      const judge = await db.orm.public.User.first({
-        id: assignment.judgeId,
-      });
+      const judge =
+        await db.orm.public.User.first({
+          id: assignment.judgeId,
+        });
 
       const scorecards =
         await db.orm.public.Scorecard.where({
           judgeAssignmentId: assignment.id,
         }).all();
 
+      const scorecardByPerformer =
+        new Map(
+          scorecards.map((scorecard) => [
+            scorecard.performerId,
+            scorecard,
+          ])
+        );
+
+      const performerStatuses =
+        sortedPerformers.map((performer) => {
+          const scorecard =
+            scorecardByPerformer.get(
+              performer.id
+            );
+
+          let status:
+            | "SUBMITTED"
+            | "INCOMPLETE"
+            | "MISSING";
+
+          if (
+            scorecard?.status ===
+            "SUBMITTED"
+          ) {
+            status = "SUBMITTED";
+          } else if (scorecard) {
+            status = "INCOMPLETE";
+          } else {
+            status = "MISSING";
+          }
+
+          return {
+            performerId: performer.id,
+            artistName: performer.artistName,
+            performanceOrder:
+              performer.performanceOrder,
+            status,
+          };
+        });
+
+      const submittedScorecards =
+        performerStatuses.filter(
+          (item) =>
+            item.status === "SUBMITTED"
+        ).length;
+
+      const incompleteScorecards =
+        performerStatuses.filter(
+          (item) =>
+            item.status === "INCOMPLETE"
+        ).length;
+
+      const missingScorecards =
+        performerStatuses.filter(
+          (item) =>
+            item.status === "MISSING"
+        ).length;
+
       return {
         assignmentId: assignment.id,
         judgeId: assignment.judgeId,
         email: judge?.email ?? "",
         name: judge?.name ?? null,
-        submittedScorecards: scorecards.filter(
-          (scorecard) => scorecard.status === "SUBMITTED"
-        ).length,
+        submittedScorecards,
+        incompleteScorecards,
+        missingScorecards,
+        performerStatuses,
       };
     })
   );
@@ -88,7 +156,9 @@ export default async function JudgesPage({
           <div className="mt-4 flex flex-wrap gap-3 text-sm text-zinc-500">
             <span>
               {judges.length}{" "}
-              {judges.length === 1 ? "judge" : "judges"}
+              {judges.length === 1
+                ? "judge"
+                : "judges"}
             </span>
 
             <span>&bull;</span>
@@ -109,8 +179,12 @@ export default async function JudgesPage({
         <section className="mt-10">
           <JudgesManager
             competitionId={competitionId}
-            competitionStatus={competition.status}
-            performersCount={performers.length}
+            competitionStatus={
+              competition.status
+            }
+            performersCount={
+              performers.length
+            }
             judges={judges}
           />
         </section>

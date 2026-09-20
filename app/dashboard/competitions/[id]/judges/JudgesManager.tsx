@@ -1,7 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
+
+type PerformerStatus = {
+  performerId: number;
+  artistName: string;
+  performanceOrder: number;
+  status:
+    | "SUBMITTED"
+    | "INCOMPLETE"
+    | "MISSING";
+};
 
 type Judge = {
   assignmentId: number;
@@ -9,6 +23,9 @@ type Judge = {
   email: string;
   name: string | null;
   submittedScorecards: number;
+  incompleteScorecards: number;
+  missingScorecards: number;
+  performerStatuses: PerformerStatus[];
 };
 
 type JudgesManagerProps = {
@@ -26,30 +43,37 @@ export default function JudgesManager({
 }: JudgesManagerProps) {
   const router = useRouter();
 
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [expandedJudgeId, setExpandedJudgeId] =
+    useState<number | null>(null);
 
-const changesLocked =
-  competitionStatus === "CANCELED" ||
-  competitionStatus === "FINALIZED" ||
-  competitionStatus === "ARCHIVED";
+  const changesLocked =
+    competitionStatus === "FINALIZED" ||
+    competitionStatus === "ARCHIVED";
 
-  async function addJudge(event: FormEvent<HTMLFormElement>) {
+  /*
+   * Keep the judging completion display live.
+   */
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      router.refresh();
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [router]);
+
+  async function addJudge(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     setError("");
 
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
-
-    if (!trimmedName) {
-      setError("Judge name is required.");
-      return;
-    }
-
-    if (!trimmedEmail) {
+    if (!email.trim()) {
       setError("Judge email is required.");
       return;
     }
@@ -65,8 +89,7 @@ const changesLocked =
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: trimmedName,
-            email: trimmedEmail,
+            email: email.trim(),
           }),
         }
       );
@@ -74,15 +97,19 @@ const changesLocked =
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Unable to assign judge.");
+        setError(
+          data.error ||
+            "Unable to assign judge."
+        );
         return;
       }
 
-      setName("");
       setEmail("");
       router.refresh();
     } catch {
-      setError("Something went wrong while assigning the judge.");
+      setError(
+        "Something went wrong while assigning the judge."
+      );
     } finally {
       setSaving(false);
     }
@@ -92,11 +119,13 @@ const changesLocked =
     assignmentId: number,
     name: string | null
   ) {
-    const displayName = name || "this judge";
+    const displayName =
+      name || "this judge";
 
-    const confirmed = window.confirm(
-      `Remove ${displayName} from this competition?`
-    );
+    const confirmed =
+      window.confirm(
+        `Remove ${displayName} from this competition?`
+      );
 
     if (!confirmed) {
       return;
@@ -111,7 +140,8 @@ const changesLocked =
         {
           method: "DELETE",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
             assignmentId,
@@ -122,32 +152,35 @@ const changesLocked =
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Unable to remove judge.");
+        setError(
+          data.error ||
+            "Unable to remove judge."
+        );
         return;
       }
 
       router.refresh();
     } catch {
-      setError("Something went wrong while removing the judge.");
+      setError(
+        "Something went wrong while removing the judge."
+      );
     } finally {
       setSaving(false);
     }
   }
 
+  function toggleJudge(
+    assignmentId: number
+  ) {
+    setExpandedJudgeId((current) =>
+      current === assignmentId
+        ? null
+        : assignmentId
+    );
+  }
+
   return (
     <div className="space-y-10">
-{competitionStatus === "CANCELED" && (
-  <div className="rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
-    <h2 className="text-xl font-semibold text-red-400">
-      Competition Canceled
-    </h2>
-
-    <p className="mt-2 text-sm text-zinc-400">
-      This competition is canceled. Judge assignments and
-      judging activity are locked.
-    </p>
-  </div>
-)}
       {!changesLocked && (
         <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
           <div className="mb-6">
@@ -156,38 +189,16 @@ const changesLocked =
             </h2>
 
             <p className="mt-1 text-sm text-zinc-400">
-              Enter the judge&apos;s name and email address. The
-              invitation will be sent to this email address.
+              Enter the email address associated with the judge&apos;s
+              Mainstage Score account.
             </p>
           </div>
 
           <form
             onSubmit={addJudge}
-            className="grid gap-4 md:grid-cols-[1fr_1fr_auto]"
+            className="flex flex-col gap-4 md:flex-row"
           >
-            <div>
-              <label
-                htmlFor="judgeName"
-                className="mb-2 block text-sm font-medium text-zinc-300"
-              >
-                Judge Name
-              </label>
-
-              <input
-                id="judgeName"
-                type="text"
-                value={name}
-                onChange={(event) =>
-                  setName(event.target.value)
-                }
-                placeholder="Judge name"
-                autoComplete="name"
-                className="w-full rounded-lg border border-zinc-700 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-amber-400"
-                disabled={saving}
-              />
-            </div>
-
-            <div>
+            <div className="flex-1">
               <label
                 htmlFor="judgeEmail"
                 className="mb-2 block text-sm font-medium text-zinc-300"
@@ -200,10 +211,11 @@ const changesLocked =
                 type="email"
                 value={email}
                 onChange={(event) =>
-                  setEmail(event.target.value)
+                  setEmail(
+                    event.target.value
+                  )
                 }
                 placeholder="judge@example.com"
-                autoComplete="email"
                 className="w-full rounded-lg border border-zinc-700 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-amber-400"
                 disabled={saving}
               />
@@ -215,7 +227,9 @@ const changesLocked =
                 disabled={saving}
                 className="w-full rounded-lg bg-amber-400 px-5 py-3 font-semibold text-black transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
               >
-                {saving ? "Assigning..." : "Assign Judge"}
+                {saving
+                  ? "Assigning..."
+                  : "Assign Judge"}
               </button>
             </div>
           </form>
@@ -234,10 +248,10 @@ const changesLocked =
             Judge Assignments Locked
           </h2>
 
-<p className="mt-2 text-sm text-zinc-400">
-  Judges cannot be added or removed after the competition
-  has been canceled, finalized, or archived.
-</p>
+          <p className="mt-2 text-sm text-zinc-400">
+            Judges cannot be added or removed after the
+            competition has been finalized or archived.
+          </p>
         </div>
       )}
 
@@ -247,16 +261,23 @@ const changesLocked =
         </div>
       )}
 
+      {/* Judging Completion */}
       <section>
-        <div className="mb-5">
-          <h2 className="text-2xl font-semibold text-white">
-            Assigned Judges
-          </h2>
+        <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">
+              Judging Completion
+            </h2>
 
-          <p className="mt-1 text-sm text-zinc-400">
-            {judges.length}{" "}
-            {judges.length === 1 ? "judge" : "judges"} assigned
-          </p>
+            <p className="mt-1 text-sm text-zinc-400">
+              Live status of every judge&apos;s scorecard
+              submissions.
+            </p>
+          </div>
+
+          <div className="text-xs text-zinc-600">
+            Updates automatically every 3 seconds
+          </div>
         </div>
 
         {judges.length === 0 ? (
@@ -264,78 +285,219 @@ const changesLocked =
             <p className="text-zinc-400">
               No judges have been assigned yet.
             </p>
-
-            {!changesLocked && (
-              <p className="mt-2 text-sm text-zinc-600">
-                Assign a judge above to begin building the judging
-                panel.
-              </p>
-            )}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {judges.map((judge) => {
-              const expectedScorecards = performersCount;
-              const submitted = judge.submittedScorecards;
+              const expected =
+                performersCount;
+
+              const submitted =
+                judge.submittedScorecards;
+
+              const incomplete =
+                judge.incompleteScorecards;
+
+              const missing =
+                judge.missingScorecards;
 
               const complete =
-                expectedScorecards > 0 &&
-                submitted >= expectedScorecards;
+                expected > 0 &&
+                submitted >= expected;
+
+              const expanded =
+                expandedJudgeId ===
+                judge.assignmentId;
+
+              const progress =
+                expected > 0
+                  ? Math.min(
+                      100,
+                      (submitted /
+                        expected) *
+                        100
+                    )
+                  : 0;
 
               return (
                 <div
                   key={judge.assignmentId}
-                  className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5"
+                  className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950"
                 >
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">
-                        {judge.name || "Unnamed Judge"}
-                      </h3>
+                  <div className="p-5">
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">
+                          {judge.name ||
+                            "Unnamed Judge"}
+                        </h3>
 
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {judge.email}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div
-                        className={`rounded-lg border px-4 py-2 text-sm font-medium ${
-                          complete
-                            ? "border-emerald-900 bg-emerald-950/20 text-emerald-400"
-                            : "border-zinc-800 bg-black text-zinc-400"
-                        }`}
-                      >
-                        {submitted} / {expectedScorecards} Submitted
+                        <p className="mt-1 text-sm text-zinc-500">
+                          {judge.email}
+                        </p>
                       </div>
 
-                      {!changesLocked && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div
+                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                            complete
+                              ? "border-emerald-900 bg-emerald-950/20 text-emerald-400"
+                              : "border-zinc-800 bg-black text-zinc-300"
+                          }`}
+                        >
+                          {submitted} /{" "}
+                          {expected} Complete
+                        </div>
+
+                        {missing > 0 && (
+                          <div className="rounded-lg border border-red-900 bg-red-950/20 px-3 py-2 text-sm font-medium text-red-400">
+                            {missing} Missing
+                          </div>
+                        )}
+
+                        {incomplete > 0 && (
+                          <div className="rounded-lg border border-amber-900 bg-amber-950/20 px-3 py-2 text-sm font-medium text-amber-400">
+                            {incomplete} Incomplete
+                          </div>
+                        )}
+
                         <button
                           type="button"
                           onClick={() =>
-                            removeJudge(
-                              judge.assignmentId,
-                              judge.name
+                            toggleJudge(
+                              judge.assignmentId
                             )
                           }
-                          disabled={
-                            saving || submitted > 0
-                          }
-                          className="rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-400 transition hover:border-red-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                          className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-amber-400 hover:text-amber-400"
                         >
-                          Remove
+                          {expanded
+                            ? "Hide Details"
+                            : "View Details"}
                         </button>
-                      )}
+
+                        {!changesLocked && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeJudge(
+                                judge.assignmentId,
+                                judge.name
+                              )
+                            }
+                            disabled={
+                              saving ||
+                              submitted > 0
+                            }
+                            className="rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-400 transition hover:border-red-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-5">
+                      <div className="mb-2 flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">
+                          Completion
+                        </span>
+
+                        <span className="text-zinc-400">
+                          {Math.round(
+                            progress
+                          )}
+                          %
+                        </span>
+                      </div>
+
+                      <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+                        <div
+                          className={`h-full transition-all ${
+                            complete
+                              ? "bg-emerald-400"
+                              : "bg-amber-400"
+                          }`}
+                          style={{
+                            width: `${progress}%`,
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {submitted > 0 && (
-                    <div className="mt-4 border-t border-zinc-800 pt-4 text-sm text-zinc-500">
-                      This judge has submitted {submitted}{" "}
-                      {submitted === 1
-                        ? "scorecard"
-                        : "scorecards"}
-                      . Submitted scores remain private.
+                  {expanded && (
+                    <div className="border-t border-zinc-800 bg-black/40 p-5">
+                      <div className="mb-4 flex flex-wrap gap-4 text-sm">
+                        <span className="text-emerald-400">
+                          ✅ {submitted} Complete
+                        </span>
+
+                        {incomplete > 0 && (
+                          <span className="text-amber-400">
+                            ⚠️ {incomplete} Incomplete
+                          </span>
+                        )}
+
+                        {missing > 0 && (
+                          <span className="text-red-400">
+                            ❌ {missing} Missing
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {judge.performerStatuses.map(
+                          (performer) => {
+                            const status =
+                              performer.status;
+
+                            return (
+                              <div
+                                key={
+                                  performer.performerId
+                                }
+                                className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <span className="w-8 shrink-0 text-sm font-semibold text-zinc-500">
+                                    #
+                                    {
+                                      performer.performanceOrder
+                                    }
+                                  </span>
+
+                                  <span className="truncate text-sm text-zinc-200">
+                                    {
+                                      performer.artistName
+                                    }
+                                  </span>
+                                </div>
+
+                                {status ===
+                                  "SUBMITTED" && (
+                                  <span className="ml-4 shrink-0 text-sm font-medium text-emerald-400">
+                                    ✅ Complete
+                                  </span>
+                                )}
+
+                                {status ===
+                                  "INCOMPLETE" && (
+                                  <span className="ml-4 shrink-0 text-sm font-medium text-amber-400">
+                                    ⚠️ Incomplete
+                                  </span>
+                                )}
+
+                                {status ===
+                                  "MISSING" && (
+                                  <span className="ml-4 shrink-0 text-sm font-medium text-red-400">
+                                    ❌ Missing
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
