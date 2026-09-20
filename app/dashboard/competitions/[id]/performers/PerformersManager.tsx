@@ -139,9 +139,12 @@ async function movePerformer(
 
   setError("");
 
-  // Update the visible lineup immediately so the order and
-  // performance numbers change without waiting for a page refresh.
+  // Save the exact current lineup in case the API request fails.
+  const previousPerformers = [...localPerformers];
+
+  // Immediately update the visible lineup.
   const optimisticPerformers = [...localPerformers];
+
   [optimisticPerformers[currentIndex], optimisticPerformers[targetIndex]] =
     [optimisticPerformers[targetIndex], optimisticPerformers[currentIndex]];
 
@@ -174,18 +177,19 @@ async function movePerformer(
     const data = await response.json();
 
     if (!response.ok) {
-      setLocalPerformers(performers);
+      // Restore the exact lineup that existed before the move.
+      setLocalPerformers(previousPerformers);
       setError(
         data.error || "Unable to reorder performer."
       );
       return;
     }
 
-    if (Array.isArray(data.performers)) {
-      setLocalPerformers(data.performers);
-    }
+    // The API accepted the reorder, so keep the
+    // optimistic local order already displayed.
   } catch {
-    setLocalPerformers(performers);
+    // Restore the exact lineup that existed before the move.
+    setLocalPerformers(previousPerformers);
     setError(
       "Something went wrong while reordering the lineup."
     );
