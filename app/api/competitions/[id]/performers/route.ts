@@ -28,7 +28,6 @@ function isLocked(status: string) {
 
 function isScoringLocked(status: string) {
   return (
-    status === "LIVE" ||
     status === "JUDGING_COMPLETE" ||
     status === "CANCELED" ||
     status === "FINALIZED" ||
