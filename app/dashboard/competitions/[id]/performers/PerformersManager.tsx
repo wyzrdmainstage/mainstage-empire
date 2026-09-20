@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Performer = {
@@ -27,6 +27,12 @@ export default function PerformersManager({
   isAdmin,
 }: PerformersManagerProps) {
   const router = useRouter();
+
+  const [localPerformers, setLocalPerformers] = useState<Performer[]>(performers);
+
+  useEffect(() => {
+    setLocalPerformers(performers);
+  }, [performers]);
 
   const [artistName, setArtistName] = useState("");
   const [songCount, setSongCount] = useState("");
@@ -113,42 +119,80 @@ async function movePerformer(
     return;
   }
 
-  setError("");
-    setSaving(true);
+  const currentIndex = localPerformers.findIndex(
+    (item) => item.id === performerId
+  );
 
-    try {
-      const response = await fetch(
-        `/api/competitions/${competitionId}/performers`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            performerId,
-            direction,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.error || "Unable to reorder performer."
-        );
-        return;
-      }
-
-      router.refresh();
-    } catch {
-      setError(
-        "Something went wrong while reordering the lineup."
-      );
-    } finally {
-      setSaving(false);
-    }
+  if (currentIndex === -1) {
+    return;
   }
+
+  const targetIndex =
+    direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+  if (
+    targetIndex < 0 ||
+    targetIndex >= localPerformers.length
+  ) {
+    return;
+  }
+
+  setError("");
+
+  // Update the visible lineup immediately so the order and
+  // performance numbers change without waiting for a page refresh.
+  const optimisticPerformers = [...localPerformers];
+  [optimisticPerformers[currentIndex], optimisticPerformers[targetIndex]] =
+    [optimisticPerformers[targetIndex], optimisticPerformers[currentIndex]];
+
+  const numberedPerformers = optimisticPerformers.map(
+    (item, index) => ({
+      ...item,
+      performanceOrder: index + 1,
+    })
+  );
+
+  setLocalPerformers(numberedPerformers);
+  setSaving(true);
+
+  try {
+    const response = await fetch(
+      `/api/competitions/${competitionId}/performers`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "reorder",
+          performerId,
+          direction,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setLocalPerformers(performers);
+      setError(
+        data.error || "Unable to reorder performer."
+      );
+      return;
+    }
+
+    if (Array.isArray(data.performers)) {
+      setLocalPerformers(data.performers);
+    }
+  } catch {
+    setLocalPerformers(performers);
+    setError(
+      "Something went wrong while reordering the lineup."
+    );
+  } finally {
+    setSaving(false);
+  }
+}
 
   function startSongCountEdit(performer: Performer) {
     if (songCountLocked) {
@@ -238,7 +282,7 @@ async function movePerformer(
     performerId: number,
     amount: number
   ) {
-    const performer = performers.find(
+    const performer = localPerformers.find(
       (item) => item.id === performerId
     );
 
@@ -288,7 +332,7 @@ async function movePerformer(
   }
 
   async function removePerformer(performerId: number) {
-    const performer = performers.find(
+    const performer = localPerformers.find(
       (item) => item.id === performerId
     );
 
@@ -344,7 +388,7 @@ if (!performer || changesLocked) {
     performerId: number,
     exclude: boolean
   ) {
-    const performer = performers.find(
+    const performer = localPerformers.find(
       (item) => item.id === performerId
     );
 
@@ -536,8 +580,8 @@ if (!performer || changesLocked) {
             </h2>
 
             <p className="mt-1 text-sm text-zinc-400">
-              {performers.length}{" "}
-              {performers.length === 1
+              {localPerformers.length}{" "}
+              {localPerformers.length === 1
                 ? "performer"
                 : "performers"}{" "}
               scheduled
@@ -545,7 +589,7 @@ if (!performer || changesLocked) {
           </div>
         </div>
 
-        {performers.length === 0 ? (
+        {localPerformers.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-10 text-center">
             <p className="text-zinc-400">
               No performers have been added yet.
@@ -559,10 +603,10 @@ if (!performer || changesLocked) {
           </div>
         ) : (
           <div className="space-y-3">
-            {performers.map((performer, index) => {
+            {localPerformers.map((performer, index) => {
               const isFirst = index === 0;
               const isLast =
-                index === performers.length - 1;
+                index === localPerformers.length - 1;
               const locked = performer.isScoringLocked;
               const editing =
                 editingSongCountId === performer.id;
