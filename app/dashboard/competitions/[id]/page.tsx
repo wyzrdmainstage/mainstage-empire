@@ -296,14 +296,30 @@ const isLocked =
       )
     ).flat();
 
+    const activeJudges =
+      judges.filter(
+        (judge) =>
+          !judge.excludedFromResults
+      );
+
+    const activeJudgeAssignmentIds =
+      new Set(
+        activeJudges.map(
+          (judge) => judge.id
+        )
+      );
+
     const submittedScorecards =
       scorecards.filter(
         (scorecard) =>
-          scorecard.status === "SUBMITTED"
+          scorecard.status === "SUBMITTED" &&
+          activeJudgeAssignmentIds.has(
+            scorecard.judgeAssignmentId
+          )
       ).length;
 
     const totalExpectedScorecards =
-      performers.length * judges.length;
+      performers.length * activeJudges.length;
 
     return (
       <main className="min-h-screen bg-black text-white">
