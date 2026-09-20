@@ -124,6 +124,52 @@ export default function StatusManager({
     }
   }
 
+  async function reopenJudging() {
+    if (status !== "JUDGING_COMPLETE") return;
+
+    const confirmed = window.confirm(
+      "Reopen judging for this competition?\n\n" +
+        "Judges included in the results will be able to submit or complete scorecards again. Existing submitted scores will be retained.\n\n" +
+        "Click OK to reopen judging."
+    );
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/competitions/${competitionId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: "LIVE",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.error ||
+            "Judging could not be reopened."
+        );
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError("Unable to reopen judging.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function cancelCompetition() {
     const reason =
       cancellationReason.trim();
@@ -234,6 +280,28 @@ export default function StatusManager({
             {loading
               ? "Updating..."
               : nextButtonLabels[status]}
+          </button>
+        </div>
+      )}
+
+      {status === "JUDGING_COMPLETE" && (
+        <div className="border-t border-zinc-800 pt-5">
+          <div className="text-sm font-semibold text-zinc-300">
+            Need more scoring?
+          </div>
+
+          <p className="mt-2 text-sm leading-6 text-zinc-400">
+            Reopen judging to let included judges finish missing
+            scorecards. Existing submitted scores will be retained.
+          </p>
+
+          <button
+            type="button"
+            onClick={reopenJudging}
+            disabled={loading}
+            className="mt-3 rounded-lg border border-amber-500/50 bg-amber-400/10 px-5 py-3 font-semibold text-amber-300 transition hover:border-amber-400 hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Updating..." : "Reopen Judging"}
           </button>
         </div>
       )}

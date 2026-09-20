@@ -332,6 +332,33 @@ export async function PATCH(
   }
 
   /*
+   * Reopening judging is only safe before tiebreak activity begins.
+   *
+   * Existing scorecards are intentionally retained. Excluded judges also
+   * remain excluded. Once a tiebreak exists, reopening could make its
+   * participants, votes, or resolved placement stale.
+   */
+  if (
+    competition.status === "JUDGING_COMPLETE" &&
+    requestedStatus === "LIVE"
+  ) {
+    const existingTiebreaks =
+      await db.orm.public.Tiebreak.where({
+        competitionId,
+      }).all();
+
+    if (existingTiebreaks.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Judging cannot be reopened after tiebreak activity has started.",
+        },
+        { status: 409 }
+      );
+    }
+  }
+
+  /*
    * Cancellation requires an explicit reason.
    * This is intentionally enforced server-side so the
    * requirement cannot be bypassed by the UI.
