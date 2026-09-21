@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 
-export default function ShareResultsButton() {
+export default function ShareResultsButton({ href }: { href?: string }) {
   const [status, setStatus] = useState<"idle" | "copied">("idle");
 
   async function handleShare() {
-    const url = window.location.href;
+    const url = href
+      ? new URL(href, window.location.origin).href
+      : window.location.href;
 
     const isMobile =
       /Android|iPhone|iPad|iPod|Windows Phone/i.test(

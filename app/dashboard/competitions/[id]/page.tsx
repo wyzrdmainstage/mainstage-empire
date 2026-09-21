@@ -1,5 +1,6 @@
 import StatusManager from "./StatusManager";
 import ResultsPanel from "./ResultsPanel";
+import ShareResultsButton from "@/app/results/ShareResultsButton";
 import TiebreakPanel from "./TiebreakPanel";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -363,6 +364,20 @@ const isLocked =
                   : "Judges"}
               </span>
             </div>
+
+            {(competition.status === "JUDGING_COMPLETE" ||
+              competition.status === "FINALIZED" ||
+              competition.status === "ARCHIVED") && (
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  href={`/results/${competitionId}`}
+                  className="inline-flex items-center justify-center rounded-lg bg-amber-400 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-300"
+                >
+                  View Results
+                </Link>
+                <ShareResultsButton href={`/results/${competitionId}`} />
+              </div>
+            )}
           </header>
 
 {(competition.status === "CANCELED" ||
@@ -540,7 +555,7 @@ const isLocked =
 
               <p className="mt-2 text-sm text-zinc-400">
                 Final rankings are calculated from the
-                judges' submitted scorecards.
+                judges&apos; submitted scorecards.
               </p>
 
               <ResultsPanel
@@ -571,7 +586,7 @@ const isLocked =
                 {isJudgeExcluded ? (
                   <>
                     <p className="mt-2 text-sm text-red-400">
-                      You have been excluded from this competition's
+                      You have been excluded from this competition&apos;s
                       official results. Your previous scores are retained,
                       but you cannot submit additional scores or vote in
                       tiebreaks while excluded.
