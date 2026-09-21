@@ -1,3 +1,4 @@
+import { advanceTiebreaks, voteLeaders } from "@/src/tiebreaks";
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { requireUser } from "@/src/auth/require-user";
@@ -23,7 +24,7 @@ async function getActiveTiebreak(competitionId: number) {
     }).all();
 
   return (
-    tiebreaks.find(
+    tiebreaks.sort((a, b) => a.placement - b.placement).find(
       (tiebreak) => tiebreak.status !== "RESOLVED"
     ) ?? null
   );
@@ -69,7 +70,7 @@ async function getFinalScores(competitionId: number) {
     );
 
   return Promise.all(
-    performers.map(async (performer) => {
+    performers.filter((performer) => !performer.excludedFromResults).map(async (performer) => {
       const scorecards = await Promise.all(
         activeAssignments.map((assignment) =>
           db.orm.public.Scorecard.first({
@@ -111,108 +112,8 @@ async function getFinalScores(competitionId: number) {
   );
 }
 
-async function createNextTiebreak(
-  competitionId: number
-) {
-  const scores =
-    await getFinalScores(competitionId);
-
-  scores.sort(
-    (a, b) => b.finalScore - a.finalScore
-  );
-
-  const tiebreaks =
-    await db.orm.public.Tiebreak.where({
-      competitionId,
-    }).all();
-
-  const resolvedTiebreaks = tiebreaks
-    .filter(
-      (tiebreak) =>
-        tiebreak.status === "RESOLVED"
-    )
-    .sort(
-      (a, b) => a.placement - b.placement
-    );
-
-  const resolvedWinners = new Set(
-    resolvedTiebreaks
-      .map(
-        (tiebreak) =>
-          tiebreak.winnerPerformerId
-      )
-      .filter(
-        (id): id is number =>
-          id !== null
-      )
-  );
-
-  /*
-   * Build the current ranking while respecting
-   * already-resolved tiebreak decisions.
-   */
-  const orderedScores = scores.filter(
-    (score) =>
-      !resolvedWinners.has(
-        score.performerId
-      )
-  );
-
-  let placement =
-    resolvedWinners.size + 1;
-
-  let index = 0;
-
-  while (index < orderedScores.length) {
-    const score =
-      orderedScores[index].finalScore;
-
-    const group = orderedScores.filter(
-      (entry) =>
-        entry.finalScore === score
-    );
-
-    if (group.length > 1) {
-      const existing =
-        tiebreaks.find(
-          (tiebreak) =>
-            tiebreak.placement ===
-              placement &&
-            tiebreak.status !== "RESOLVED"
-        );
-
-      if (existing) {
-        return existing;
-      }
-
-      const tiebreak =
-        await db.orm.public.Tiebreak.create({
-          competitionId,
-          placement,
-          status: "JUDGES_VOTING",
-          createdAt:
-            new Date().toISOString(),
-          updatedAt:
-            new Date().toISOString(),
-        });
-
-      for (const entry of group) {
-        await db.orm.public.TiebreakPerformer.create(
-          {
-            tiebreakId: tiebreak.id,
-            performerId: entry.performerId,
-          }
-        );
-      }
-
-      return tiebreak;
-    }
-
-    placement += group.length;
-    index += group.length;
-  }
-
-  return null;
+async function createNextTiebreak(competitionId: number) {
+  return advanceTiebreaks(competitionId, await getFinalScores(competitionId));
 }
 
 export async function GET(
@@ -246,6 +147,10 @@ export async function GET(
       },
       { status: 404 }
     );
+  }
+
+  if (competition.status !== "JUDGING_COMPLETE") {
+    return NextResponse.json({ tiebreak: null });
   }
 
   const isAdmin =
@@ -402,7 +307,9 @@ export async function GET(
       status: tiebreak.status,
       winnerPerformerId:
         tiebreak.winnerPerformerId,
-      performers,
+      performers: tiebreak.status === "ORGANIZER_VOTING"
+        ? performers.filter((p) => voteLeaders(performers.map((candidate) => candidate.id), activeVotes.filter((v) => v.voterType === "JUDGE")).includes(p.id))
+        : performers,
       ...(judgeVotingStatus ? { judgeVotingStatus } : {}),
       hasVoted:
         currentVoterType !== null &&
@@ -452,6 +359,8 @@ export async function POST(
     await request.json().catch(
       () => null
     );
+
+  const requestedTiebreakId = Number(body?.tiebreakId);
 
   const performerId =
     Number(body?.performerId);
@@ -520,6 +429,10 @@ export async function POST(
     );
   }
 
+  if (competition.status !== "JUDGING_COMPLETE") {
+    return NextResponse.json({ error: "Tiebreak voting is closed." }, { status: 409 });
+  }
+
   let tiebreak =
     await getActiveTiebreak(
       competitionId
@@ -552,6 +465,10 @@ export async function POST(
       },
       { status: 409 }
     );
+  }
+
+  if (requestedTiebreakId !== tiebreak.id) {
+    return NextResponse.json({ error: "Voting has moved on. Refresh the page before voting." }, { status: 409 });
   }
 
   /*
@@ -637,6 +554,17 @@ export async function POST(
       },
       { status: 400 }
     );
+  }
+
+  if (shouldVoteAsOrganizer) {
+    const entries = await getTiebreakPerformers(tiebreak.id);
+    const assignments = await db.orm.public.CompetitionJudge.where({ competitionId }).all();
+    const eligible = new Set(assignments.filter((a) => !a.excludedFromResults).map((a) => a.judgeId));
+    const ballots = await db.orm.public.TiebreakVote.where({ tiebreakId: tiebreak.id }).all();
+    const leaders = voteLeaders(entries.map((p) => p.id), ballots.filter((v) => v.voterType === "JUDGE" && eligible.has(v.userId)));
+    if (!leaders.includes(performerId)) {
+      return NextResponse.json({ error: "Select one of the tied vote leaders." }, { status: 400 });
+    }
   }
 
   const voterType =

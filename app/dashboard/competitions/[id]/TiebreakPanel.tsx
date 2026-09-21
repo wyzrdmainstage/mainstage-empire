@@ -122,6 +122,7 @@ export default function TiebreakPanel({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            tiebreakId: tiebreak.id,
             performerId,
           }),
         }
@@ -203,7 +204,9 @@ export default function TiebreakPanel({
         <>
           <p className="mt-4 text-sm leading-6 text-zinc-400">
             The judges must select the performer who
-            should receive this placement.
+            should receive this placement. Once all judges have voted,
+            different vote totals determine the remaining placements;
+            only equal totals require another decision.
           </p>
 
           {excludedFromResults && role === "JUDGE" ? (

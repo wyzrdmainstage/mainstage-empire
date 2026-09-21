@@ -1,3 +1,4 @@
+import { advanceTiebreaks } from "@/src/tiebreaks";
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { requireRole } from "@/src/auth/require-user";
@@ -39,7 +40,7 @@ async function calculateResults(competitionId: number) {
     );
 
   const results = await Promise.all(
-    performers.map(async (performer) => {
+    performers.filter((performer) => !performer.excludedFromResults).map(async (performer) => {
       const scorecards = await Promise.all(
         eligibleAssignments.map((assignment) =>
           db.orm.public.Scorecard.first({
@@ -86,138 +87,8 @@ async function calculateResults(competitionId: number) {
   return results;
 }
 
-async function createNextTiebreak(
-  competitionId: number
-) {
-  const results =
-    await calculateResults(competitionId);
-
-  const tiebreaks =
-    await db.orm.public.Tiebreak.where({
-      competitionId,
-    }).all();
-
-  const unresolved =
-    tiebreaks.find(
-      (tiebreak) =>
-        tiebreak.status !== "RESOLVED"
-    );
-
-  if (unresolved) {
-    return unresolved;
-  }
-
-  const resolved =
-    tiebreaks.filter(
-      (tiebreak) =>
-        tiebreak.status === "RESOLVED"
-    );
-
-  const resolvedWinners = new Set(
-    resolved
-      .map(
-        (tiebreak) =>
-          tiebreak.winnerPerformerId
-      )
-      .filter(
-        (id): id is number =>
-          id !== null
-      )
-  );
-
-  /*
-   * Walk the score ranking from the top.
-   *
-   * A resolved tiebreak winner occupies the placement
-   * recorded on that tiebreak.
-   */
-  let placement = 1;
-
-  for (let index = 0; index < results.length; ) {
-    const current = results[index];
-
-    /*
-     * A performer who already won a tiebreak has already
-     * been assigned a placement.
-     */
-    if (
-      resolvedWinners.has(
-        current.performerId
-      )
-    ) {
-      const resolvedWinner =
-        resolved.find(
-          (tiebreak) =>
-            tiebreak.winnerPerformerId ===
-            current.performerId
-        );
-
-      if (resolvedWinner) {
-        placement =
-          resolvedWinner.placement + 1;
-      }
-
-      index++;
-      continue;
-    }
-
-    const score = current.finalScore;
-
-    const group = results.filter(
-      (result) =>
-        result.finalScore === score &&
-        !resolvedWinners.has(
-          result.performerId
-        )
-    );
-
-    /*
-     * Multiple performers with the same score require
-     * a tiebreak for this placement.
-     */
-    if (group.length > 1) {
-      const existing =
-        resolved.find(
-          (tiebreak) =>
-            tiebreak.placement ===
-              placement &&
-            tiebreak.status !== "RESOLVED"
-        );
-
-      if (existing) {
-        return existing;
-      }
-
-      const tiebreak =
-        await db.orm.public.Tiebreak.create({
-          competitionId,
-          placement,
-          status: "JUDGES_VOTING",
-          createdAt:
-            new Date().toISOString(),
-          updatedAt:
-            new Date().toISOString(),
-        });
-
-      for (const result of group) {
-        await db.orm.public.TiebreakPerformer.create({
-          tiebreakId: tiebreak.id,
-          performerId:
-            result.performerId,
-        });
-      }
-
-      return tiebreak;
-    }
-
-    /*
-     * A single performer occupies this placement.
-     */
-    placement++;
-    index++;
-  }
-
-  return null;
+async function createNextTiebreak(competitionId: number) {
+  return advanceTiebreaks(competitionId, await calculateResults(competitionId));
 }
 
 export async function PATCH(
