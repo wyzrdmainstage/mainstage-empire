@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/src/prisma/db";
 import ShareResultsButton from "@/app/results/ShareResultsButton";
+import type { ReactNode } from "react";
 
 type ResultsPageProps = {
   params: Promise<{
@@ -23,6 +24,139 @@ case "ARCHIVED":
       return status;
   }
 }
+
+function TiebreakBadge({
+  tiebreak,
+}: {
+  tiebreak?: { placement: number; winner: boolean };
+}) {
+
+  if (!tiebreak) {
+    return null;
+  }
+
+  return (
+    <span className="mt-4 inline-flex rounded-full border border-amber-500/30 bg-amber-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+      {tiebreak.winner
+        ? "Tiebreak Winner"
+        : "Tiebreak Participant"}
+    </span>
+  );
+}
+
+function ScoresheetLink({ competitionId, result, isOfficial, children }: {
+  competitionId: number;
+  result: { performerId: number; artistName: string; judgeCount: number };
+  isOfficial: boolean;
+  children: ReactNode;
+}) {
+  if (!isOfficial || result.judgeCount === 0) return children;
+
+  return (
+    <Link
+      href={`/results/${competitionId}/performers/${result.performerId}`}
+      aria-label={`View ${result.artistName}'s scoresheet`}
+      className="inline-flex min-h-11 flex-col items-center rounded-lg px-2 py-1 transition hover:bg-amber-400/10 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-400"
+    >
+      {children}
+      <span className="mt-2 text-[10px] font-medium tracking-normal text-amber-400/80">View scoresheet →</span>
+    </Link>
+  );
+}
+
+function PodiumCard({
+  result,
+  place,
+  champion,
+  competitionId,
+  isOfficial,
+  tiebreakInfoByPerformer,
+}: {
+  result:
+    | { performerId: number; artistName: string; performanceOrder: number; judgeCount: number; finalScore: number }
+    | undefined;
+  place: number;
+  champion?: boolean;
+  competitionId: number;
+  isOfficial: boolean;
+  tiebreakInfoByPerformer: Map<number, { placement: number; winner: boolean }>;
+}) {
+  if (!result) {
+    return null;
+  }
+
+  return (
+    <article
+      className={`flex flex-col items-center rounded-3xl border bg-zinc-950 text-center ${
+        champion
+          ? "min-h-[420px] border-amber-400/70 px-7 py-10 shadow-[0_0_70px_rgba(245,185,66,0.14)] sm:min-h-[450px] sm:px-10 sm:py-12"
+          : "min-h-[310px] border-zinc-700 px-6 py-8"
+      }`}
+    >
+      <div
+        className={`flex items-center justify-center rounded-2xl border font-black ${
+          champion
+            ? "h-24 w-24 border-amber-400/80 bg-amber-400/10 text-4xl text-amber-400 shadow-[0_0_30px_rgba(245,185,66,0.10)]"
+            : "h-16 w-16 border-amber-500/50 bg-amber-400/5 text-2xl text-amber-400"
+        }`}
+      >
+        #{place}
+      </div>
+
+      <p
+        className={`mt-6 text-xs font-bold uppercase tracking-[0.35em] ${
+          champion
+            ? "text-amber-400"
+            : "text-zinc-500"
+        }`}
+      >
+        {champion
+          ? "Champion"
+          : place === 2
+            ? "2nd Place"
+            : "3rd Place"}
+      </p>
+
+      <h3
+        className={`mt-3 font-black leading-tight text-white ${
+          champion
+            ? "text-3xl sm:text-4xl"
+            : "text-2xl"
+        }`}
+      >
+        {result.artistName}
+      </h3>
+
+      <p className="mt-2 text-sm text-zinc-500">
+        Performance #
+        {result.performanceOrder}
+      </p>
+
+      <div className="mt-auto pt-8">
+        <p
+          className={`font-black text-amber-400 ${
+            champion
+              ? "text-5xl"
+              : "text-3xl"
+          }`}
+        >
+          <ScoresheetLink competitionId={competitionId} result={result} isOfficial={isOfficial}>
+            {result.finalScore.toFixed(1)}
+          </ScoresheetLink>
+        </p>
+
+        <p className="mt-1 text-xs font-medium uppercase tracking-wider text-zinc-600">
+          / 60
+        </p>
+
+        <TiebreakBadge
+          tiebreak={tiebreakInfoByPerformer.get(result.performerId)}
+        />
+      </div>
+    </article>
+  );
+}
+
 
 export default async function ResultsPage({
   params,
@@ -133,6 +267,8 @@ if (competition.status === "CANCELED") {
       competitionId,
     }).all();
 
+  const eligibleAssignments = assignments.filter((assignment) => !assignment.excludedFromResults);
+
   const tiebreaks =
     await db.orm.public.Tiebreak.where({
       competitionId,
@@ -203,7 +339,7 @@ if (competition.status === "CANCELED") {
       async (performer) => {
         const scorecards =
           await Promise.all(
-            assignments.map(
+            eligibleAssignments.map(
               (assignment) =>
                 db.orm.public.Scorecard.first({
                   performerId:
@@ -496,117 +632,6 @@ if (competition.status === "CANCELED") {
       return place > 3;
     });
 
-  function TiebreakBadge({
-    performerId,
-  }: {
-    performerId: number;
-  }) {
-    const tiebreak =
-      tiebreakInfoByPerformer.get(
-        performerId
-      );
-
-    if (!tiebreak) {
-      return null;
-    }
-
-    return (
-      <span className="mt-4 inline-flex rounded-full border border-amber-500/30 bg-amber-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
-        {tiebreak.winner
-          ? "Tiebreak Winner"
-          : "Tiebreak Participant"}
-      </span>
-    );
-  }
-
-  function PodiumCard({
-    result,
-    place,
-    champion,
-  }: {
-    result:
-      | (typeof results)[number]
-      | undefined;
-    place: number;
-    champion?: boolean;
-  }) {
-    if (!result) {
-      return null;
-    }
-
-    return (
-      <article
-        className={`flex flex-col items-center rounded-3xl border bg-zinc-950 text-center ${
-          champion
-            ? "min-h-[420px] border-amber-400/70 px-7 py-10 shadow-[0_0_70px_rgba(245,185,66,0.14)] sm:min-h-[450px] sm:px-10 sm:py-12"
-            : "min-h-[310px] border-zinc-700 px-6 py-8"
-        }`}
-      >
-        <div
-          className={`flex items-center justify-center rounded-2xl border font-black ${
-            champion
-              ? "h-24 w-24 border-amber-400/80 bg-amber-400/10 text-4xl text-amber-400 shadow-[0_0_30px_rgba(245,185,66,0.10)]"
-              : "h-16 w-16 border-amber-500/50 bg-amber-400/5 text-2xl text-amber-400"
-          }`}
-        >
-          #{place}
-        </div>
-
-        <p
-          className={`mt-6 text-xs font-bold uppercase tracking-[0.35em] ${
-            champion
-              ? "text-amber-400"
-              : "text-zinc-500"
-          }`}
-        >
-          {champion
-            ? "Champion"
-            : place === 2
-              ? "2nd Place"
-              : "3rd Place"}
-        </p>
-
-        <h3
-          className={`mt-3 font-black leading-tight text-white ${
-            champion
-              ? "text-3xl sm:text-4xl"
-              : "text-2xl"
-          }`}
-        >
-          {result.artistName}
-        </h3>
-
-        <p className="mt-2 text-sm text-zinc-500">
-          Performance #
-          {result.performanceOrder}
-        </p>
-
-        <div className="mt-auto pt-8">
-          <p
-            className={`font-black text-amber-400 ${
-              champion
-                ? "text-5xl"
-                : "text-3xl"
-            }`}
-          >
-            {result.finalScore.toFixed(
-              1
-            )}
-          </p>
-
-          <p className="mt-1 text-xs font-medium uppercase tracking-wider text-zinc-600">
-            / 60
-          </p>
-
-          <TiebreakBadge
-            performerId={
-              result.performerId
-            }
-          />
-        </div>
-      </article>
-    );
-  }
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -650,8 +675,8 @@ if (competition.status === "CANCELED") {
               </span>
 
               <span className="rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm text-zinc-400">
-                {assignments.length}{" "}
-                {assignments.length === 1
+                {eligibleAssignments.length}{" "}
+                {eligibleAssignments.length === 1
                   ? "Judge"
                   : "Judges"}
               </span>
@@ -676,7 +701,7 @@ if (competition.status === "CANCELED") {
             </h2>
 
             <p className="mt-2 text-sm text-zinc-500">
-              Rankings are based on judges'
+              Rankings are based on judges&apos;
               submitted scorecards.
             </p>
           </div>
@@ -723,6 +748,9 @@ if (competition.status === "CANCELED") {
                   <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-6 md:items-end md:gap-x-6 md:gap-y-12">
                     <div className="md:col-span-6 md:px-20 lg:px-28">
                       <PodiumCard
+                        competitionId={competitionId}
+                        isOfficial={isOfficial}
+                        tiebreakInfoByPerformer={tiebreakInfoByPerformer}
                         result={firstPlace}
                         place={1}
                         champion
@@ -731,6 +759,9 @@ if (competition.status === "CANCELED") {
 
                     <div className="md:col-span-3 md:pr-3">
                       <PodiumCard
+                        competitionId={competitionId}
+                        isOfficial={isOfficial}
+                        tiebreakInfoByPerformer={tiebreakInfoByPerformer}
                         result={secondPlace}
                         place={2}
                       />
@@ -738,6 +769,9 @@ if (competition.status === "CANCELED") {
 
                     <div className="md:col-span-3 md:pl-3">
                       <PodiumCard
+                        competitionId={competitionId}
+                        isOfficial={isOfficial}
+                        tiebreakInfoByPerformer={tiebreakInfoByPerformer}
                         result={thirdPlace}
                         place={3}
                       />
@@ -796,17 +830,15 @@ if (competition.status === "CANCELED") {
                               </p>
 
                               <TiebreakBadge
-                                performerId={
-                                  result.performerId
-                                }
+                                tiebreak={tiebreakInfoByPerformer.get(result.performerId)}
                               />
                             </div>
 
                             <div className="shrink-0 text-right">
                               <p className="text-lg font-black text-amber-400">
-                                {result.finalScore.toFixed(
-                                  1
-                                )}
+                                <ScoresheetLink competitionId={competitionId} result={result} isOfficial={isOfficial}>
+                                  {result.finalScore.toFixed(1)}
+                                </ScoresheetLink>
                               </p>
 
                               <p className="text-[10px] uppercase tracking-wider text-zinc-600">

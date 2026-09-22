@@ -1,5 +1,7 @@
 ﻿import { db } from "@/src/prisma/db";
 
+import ScoresheetActions from "@/app/results/ScoresheetActions";
+
 type ResultsPanelProps = {
   competitionId: number;
   status:
@@ -559,6 +561,10 @@ export default async function ResultsPanel({
                   <div className="font-semibold text-white">
                     {result.artistName}
                   </div>
+
+                  {(status === "FINALIZED" || status === "ARCHIVED") && result.judgeCount > 0 && (
+                    <ScoresheetActions competitionId={competitionId} performerId={result.performerId} artistName={result.artistName} />
+                  )}
 
                   <div className="mt-1 text-xs text-zinc-500">
                     Performance #

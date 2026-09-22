@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 
-export default function ShareResultsButton({ href }: { href?: string }) {
+export default function ShareResultsButton({
+  href,
+  label = "Share Results",
+  title = "Mainstage Empire Competition Results",
+}: { href?: string; label?: string; title?: string }) {
   const [status, setStatus] = useState<"idle" | "copied">("idle");
 
   async function handleShare() {
@@ -18,13 +22,13 @@ export default function ShareResultsButton({ href }: { href?: string }) {
     if (isMobile && typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: "Mainstage Empire Competition Results",
+          title,
           url,
         });
 
         return;
-      } catch {
-        return;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
       }
     }
 
@@ -36,7 +40,7 @@ export default function ShareResultsButton({ href }: { href?: string }) {
         setStatus("idle");
       }, 2000);
     } catch {
-      window.prompt("Copy this results link:", url);
+      window.prompt("Copy this link:", url);
     }
   }
 
@@ -46,7 +50,7 @@ export default function ShareResultsButton({ href }: { href?: string }) {
       onClick={handleShare}
       className="inline-flex items-center justify-center rounded-lg border border-amber-400/40 bg-amber-400/10 px-5 py-2.5 text-sm font-semibold text-amber-400 transition hover:border-amber-400/70 hover:bg-amber-400/15"
     >
-      {status === "copied" ? "Link Copied!" : "Share Results"}
+      {status === "copied" ? "Link Copied!" : label}
     </button>
   );
 }
