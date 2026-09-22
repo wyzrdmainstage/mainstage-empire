@@ -224,30 +224,14 @@ export default function ScorecardForm({
             key={category.key}
             className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-semibold">
-                  {category.label}
-                </h3>
+            <div>
+              <h3 className="text-xl font-semibold">
+                {category.label}
+              </h3>
 
-                <p className="mt-2 text-sm leading-6 text-zinc-400">
-                  {category.description}
-                </p>
-              </div>
-
-              <div className="group relative shrink-0">
-                <button
-                  type="button"
-                  aria-label={`Information about ${category.label}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 text-sm text-zinc-400 hover:border-amber-400 hover:text-amber-400"
-                >
-                  i
-                </button>
-
-                <div className="pointer-events-none absolute right-0 top-10 z-10 w-64 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-xs leading-5 text-zinc-300 opacity-0 shadow-xl transition group-hover:opacity-100">
-                  {category.description}
-                </div>
-              </div>
+              <p className="mt-2 text-sm leading-6 text-zinc-400">
+                {category.description}
+              </p>
             </div>
 
             <div className="mt-5 grid grid-cols-5 gap-2 sm:grid-cols-10">
