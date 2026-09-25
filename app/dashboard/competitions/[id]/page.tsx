@@ -414,6 +414,18 @@ const isLocked =
 
           <section className="mt-10 grid gap-6 md:grid-cols-2">
             <Link
+              href={`/dashboard/competitions/${competitionId}/feedback`}
+              className="group rounded-2xl border border-zinc-800 bg-zinc-950 p-6 transition hover:border-amber-400/50 md:col-span-2"
+            >
+              <h2 className="text-2xl font-semibold">Judge Feedback</h2>
+              <p className="mt-2 text-sm text-zinc-400">
+                Review submitted judges&apos; notes for each performer.
+              </p>
+              <div className="mt-4 text-sm font-medium text-amber-400">
+                View Judge Feedback &rarr;
+              </div>
+            </Link>
+            <Link
               href={`/dashboard/competitions/${competitionId}/performers`}
               className="group rounded-2xl border border-zinc-800 bg-zinc-950 p-6 transition hover:border-amber-400/50"
             >
