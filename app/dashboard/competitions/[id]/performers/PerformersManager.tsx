@@ -422,12 +422,12 @@ async function movePerformer(
       (item) => item.id === performerId
     );
 
-if (!performer || changesLocked) {
+if (!performer || changesLocked || saving) {
   return;
 }
 
     const confirmed = window.confirm(
-      `Remove "${performer.artistName}" from the lineup?`
+      `Remove "${performer.artistName}" from the lineup?\n\nThis permanently deletes this performer and ALL judges' scores and written feedback for them, including drafts. Remaining performers will be renumbered. Other performers' scores are unaffected.\n\nThis cannot be undone.`
     );
 
     if (!confirmed) {
@@ -447,6 +447,7 @@ if (!performer || changesLocked) {
           },
           body: JSON.stringify({
             performerId,
+            confirmRemoval: true,
           }),
         }
       );
@@ -971,7 +972,7 @@ if (!performer || changesLocked) {
                               removePerformer(performer.id)
                             }
                             disabled={
-                              saving || locked
+                              saving
                             }
                             className="rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-400 transition hover:border-red-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
                           >

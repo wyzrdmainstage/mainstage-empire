@@ -586,6 +586,7 @@ if (
 
   let body: {
     performerId?: number;
+    confirmRemoval?: boolean;
   };
 
   try {
@@ -620,49 +621,36 @@ if (
     );
   }
 
-  const scorecards = await db.orm.public.Scorecard
-    .where({ performerId })
-    .all();
-
-  if (scorecards.length > 0) {
+  if (body.confirmRemoval !== true) {
     return NextResponse.json(
-      {
-        error:
-          "This performer cannot be removed because scorecards already exist.",
-      },
+      { error: "Confirm removing this performer and all their scores and feedback." },
       { status: 400 }
     );
   }
 
-  await db.orm.public.Performer
-    .where({ id: performerId })
-    .delete();
-
-  const remainingPerformers = await db.orm.public.Performer
-    .where({ competitionId })
-    .all();
-
-  const sortedPerformers = [...remainingPerformers].sort(
-    (a, b) => a.performanceOrder - b.performanceOrder
-  );
-
-  for (let index = 0; index < sortedPerformers.length; index++) {
-    const expectedOrder = index + 1;
-
-    if (
-      sortedPerformers[index].performanceOrder !== expectedOrder
-    ) {
-      await db.orm.public.Performer
-        .where({ id: sortedPerformers[index].id })
-        .update({
-          performanceOrder: expectedOrder,
-        });
-    }
+  const tiebreak = await db.orm.public.Tiebreak.first({ competitionId });
+  if (tiebreak) {
+    return NextResponse.json(
+      { error: "Performers cannot be removed after tiebreak activity has started. An admin can exclude them from results instead." },
+      { status: 409 }
+    );
   }
 
-  const updatedPerformers = await db.orm.public.Performer
-    .where({ competitionId })
-    .all();
+  // Keep scorecard deletion, performer deletion, and lineup numbering atomic.
+  const updatedPerformers = await db.transaction(async (tx) => {
+    await tx.orm.public.Scorecard.where({ performerId }).delete();
+    await tx.orm.public.Performer.where({ id: performerId, competitionId }).delete();
+
+    const remaining = await tx.orm.public.Performer.where({ competitionId }).all();
+    remaining.sort((a, b) => a.performanceOrder - b.performanceOrder || a.id - b.id);
+    for (let index = 0; index < remaining.length; index++) {
+      if (remaining[index].performanceOrder !== index + 1) {
+        await tx.orm.public.Performer.where({ id: remaining[index].id, competitionId })
+          .update({ performanceOrder: index + 1 });
+      }
+    }
+    return tx.orm.public.Performer.where({ competitionId }).all();
+  });
 
   return NextResponse.json({
     performers: [...updatedPerformers].sort(
