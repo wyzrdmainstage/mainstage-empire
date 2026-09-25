@@ -44,6 +44,7 @@ export default function JudgesManager({
 }: JudgesManagerProps) {
   const router = useRouter();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -74,6 +75,11 @@ export default function JudgesManager({
 
     setError("");
 
+    if (!name.trim()) {
+      setError("Judge name is required.");
+      return;
+    }
+
     if (!email.trim()) {
       setError("Judge email is required.");
       return;
@@ -90,6 +96,7 @@ export default function JudgesManager({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            name: name.trim(),
             email: email.trim(),
           }),
         }
@@ -105,6 +112,7 @@ export default function JudgesManager({
         return;
       }
 
+      setName("");
       setEmail("");
       router.refresh();
     } catch {
@@ -252,8 +260,8 @@ export default function JudgesManager({
             </h2>
 
             <p className="mt-1 text-sm text-zinc-400">
-              Enter the email address associated with the judge&apos;s
-              Mainstage Score account.
+              Enter the judge&apos;s name and email address to assign them
+              and send an invitation.
             </p>
           </div>
 
@@ -261,6 +269,26 @@ export default function JudgesManager({
             onSubmit={addJudge}
             className="flex flex-col gap-4 md:flex-row"
           >
+            <div className="flex-1">
+              <label
+                htmlFor="judgeName"
+                className="mb-2 block text-sm font-medium text-zinc-300"
+              >
+                Judge Name
+              </label>
+
+              <input
+                id="judgeName"
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Judge name"
+                className="w-full rounded-lg border border-zinc-700 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-amber-400"
+                disabled={saving}
+                required
+              />
+            </div>
+
             <div className="flex-1">
               <label
                 htmlFor="judgeEmail"
