@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Performer = {
@@ -30,16 +30,52 @@ export default function PerformersManager({
 
   const [localPerformers, setLocalPerformers] = useState<Performer[]>(performers);
 
-  useEffect(() => {
+  const [previousPerformers, setPreviousPerformers] = useState(performers);
+  if (performers !== previousPerformers) {
+    setPreviousPerformers(performers);
     setLocalPerformers(performers);
-  }, [performers]);
+  }
 
   const [artistName, setArtistName] = useState("");
   const [songCount, setSongCount] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  async function resetScores(performer: Performer) {
+    if (saving || competitionStatus !== "LIVE") return;
+    const confirmed = window.confirm(
+      `Reset scores for "${performer.artistName}"?\n\nThis permanently clears ALL judges' scores and written feedback for this performer, including drafts. Judges will need to refresh their queue and score this performer again. Other performers are unaffected.\n\nThis cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setResetMessage("");
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/competitions/${competitionId}/performers`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resetScores", performerId: performer.id, confirmReset: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Unable to reset scores.");
+        return;
+      }
+      setLocalPerformers((current) => current.map((item) =>
+        item.id === performer.id ? { ...item, isScoringLocked: false } : item
+      ));
+      setResetMessage(`All judges' scores and feedback for "${performer.artistName}" have been cleared. Ask judges to refresh their queue to score again.`);
+      router.refresh();
+    } catch {
+      setError("Unable to confirm the reset. Refresh the page to check before trying again.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function saveName(event: FormEvent<HTMLFormElement>, performerId: number) {
     event.preventDefault();
@@ -498,6 +534,11 @@ if (!performer || changesLocked) {
 
   return (
     <div className="space-y-10">
+      {resetMessage && (
+        <p role="status" className="rounded-xl border border-emerald-900 bg-emerald-950/20 p-4 text-sm text-emerald-300">
+          {resetMessage}
+        </p>
+      )}
 {competitionStatus === "CANCELED" && (
   <div className="rounded-2xl border border-red-900/50 bg-red-950/20 p-6">
     <h2 className="text-xl font-semibold text-red-400">
@@ -876,6 +917,16 @@ if (!performer || changesLocked) {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      {competitionStatus === "LIVE" && locked && (
+                        <button
+                          type="button"
+                          onClick={() => resetScores(performer)}
+                          disabled={saving}
+                          className="rounded-lg border border-red-900 px-4 py-2 text-sm font-medium text-red-400 transition hover:border-red-500 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                          Reset Scores
+                        </button>
+                      )}
                       {!changesLocked && (
                         <>
                           <button
@@ -974,6 +1025,7 @@ if (!performer || changesLocked) {
       {competitionStatus === "JUDGING_COMPLETE" && (
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-500">
           Song counts are locked because judging is complete.
+          {" "}To reset a performer&apos;s scores, reopen judging from Competition Status first. Reopening is only available before tiebreak activity starts.
         </div>
       )}
     </div>

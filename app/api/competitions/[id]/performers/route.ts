@@ -162,6 +162,7 @@ export async function POST(request: Request, { params }: Params) {
  * - updateSupporterCount
  * - excludeFromResults
  * - restoreFromResults
+ * - resetScores
  */
 export async function PATCH(request: Request, { params }: Params) {
   const { id: idParam } = await params;
@@ -201,6 +202,7 @@ export async function PATCH(request: Request, { params }: Params) {
     direction?: "up" | "down";
     songCount?: number | null;
     supporterCount?: number;
+    confirmReset?: boolean;
   };
 
   try {
@@ -234,6 +236,36 @@ export async function PATCH(request: Request, { params }: Params) {
       { error: "Performer not found." },
       { status: 404 }
     );
+  }
+
+  if (action === "resetScores") {
+    if (competition.status !== "LIVE") {
+      return NextResponse.json(
+        { error: "Scores can only be reset while the competition is live. Reopen judging first if judging is complete." },
+        { status: 409 }
+      );
+    }
+
+    if (body.confirmReset !== true) {
+      return NextResponse.json(
+        { error: "Confirm clearing all judges' scores and feedback for this performer." },
+        { status: 400 }
+      );
+    }
+
+    const tiebreak = await db.orm.public.Tiebreak.first({ competitionId });
+    if (tiebreak) {
+      return NextResponse.json(
+        { error: "Scores cannot be reset after tiebreak activity has started." },
+        { status: 409 }
+      );
+    }
+
+    // A single delete clears submitted and draft cards for every judge.
+    // The performer was scoped to this competition above.
+    await db.orm.public.Scorecard.where({ performerId }).delete();
+
+    return NextResponse.json({ success: true });
   }
 
   if (action === "updateArtistName") {
