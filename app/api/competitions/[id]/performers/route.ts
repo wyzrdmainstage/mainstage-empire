@@ -157,6 +157,7 @@ export async function POST(request: Request, { params }: Params) {
  *
  * Supported actions:
  * - reorder
+ * - updateArtistName
  * - updateSongCount
  * - updateSupporterCount
  * - excludeFromResults
@@ -195,6 +196,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   let body: {
     action?: string;
+    artistName?: string;
     performerId?: number;
     direction?: "up" | "down";
     songCount?: number | null;
@@ -232,6 +234,31 @@ export async function PATCH(request: Request, { params }: Params) {
       { error: "Performer not found." },
       { status: 404 }
     );
+  }
+
+  if (action === "updateArtistName") {
+    if (isLocked(competition.status)) {
+      return NextResponse.json(
+        { error: "Performer names cannot be changed in canceled, finalized, or archived competitions." },
+        { status: 400 }
+      );
+    }
+
+    const artistName =
+      typeof body.artistName === "string" ? body.artistName.trim() : "";
+
+    if (!artistName) {
+      return NextResponse.json(
+        { error: "Artist name is required." },
+        { status: 400 }
+      );
+    }
+
+    const updatedPerformer = await db.orm.public.Performer
+      .where({ id: performerId, competitionId })
+      .update({ artistName });
+
+    return NextResponse.json({ performer: updatedPerformer });
   }
 
   /*

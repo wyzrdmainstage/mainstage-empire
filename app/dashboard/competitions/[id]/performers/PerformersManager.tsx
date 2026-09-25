@@ -38,6 +38,52 @@ export default function PerformersManager({
   const [songCount, setSongCount] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [editingNameId, setEditingNameId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  async function saveName(event: FormEvent<HTMLFormElement>, performerId: number) {
+    event.preventDefault();
+    if (changesLocked || saving) return;
+
+    setError("");
+    const name = editingName.trim();
+    if (!name) {
+      setError("Artist name is required.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `/api/competitions/${competitionId}/performers`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "updateArtistName",
+            performerId,
+            artistName: name,
+          }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Unable to update performer name.");
+        return;
+      }
+
+      setLocalPerformers((current) => current.map((performer) =>
+        performer.id === performerId ? { ...performer, artistName: name } : performer
+      ));
+      setEditingNameId(null);
+      setEditingName("");
+      router.refresh();
+    } catch {
+      setError("Something went wrong while updating the performer name.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const [editingSongCountId, setEditingSongCountId] =
     useState<number | null>(null);
@@ -632,9 +678,59 @@ if (!performer || changesLocked) {
 
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold text-white">
-                            {performer.artistName}
-                          </h3>
+                          {editingNameId === performer.id && !changesLocked ? (
+                            <form
+                              onSubmit={(event) => saveName(event, performer.id)}
+                              className="flex flex-wrap items-center gap-2"
+                            >
+                              <input
+                                type="text"
+                                aria-label="Performer name"
+                                value={editingName}
+                                onChange={(event) => setEditingName(event.target.value)}
+                                required
+                                autoFocus
+                                disabled={saving}
+                                className="w-full rounded-lg border border-zinc-700 bg-black px-3 py-2 text-sm text-white outline-none focus:border-amber-400 sm:w-64"
+                              />
+                              <button
+                                type="submit"
+                                disabled={saving}
+                                className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-semibold text-black hover:bg-amber-300 disabled:opacity-50"
+                              >
+                                {saving ? "Saving…" : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingNameId(null); setEditingName(""); setError(""); }}
+                                disabled={saving}
+                                className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </form>
+                          ) : (
+                            <>
+                              <h3 className="text-lg font-semibold text-white">
+                                {performer.artistName}
+                              </h3>
+                              {!changesLocked && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingNameId(performer.id);
+                                    setEditingName(performer.artistName);
+                                    setError("");
+                                  }}
+                                  disabled={saving}
+                                  aria-label={`Edit name for ${performer.artistName}`}
+                                  className="text-sm font-medium text-amber-400 hover:text-amber-300 disabled:opacity-50"
+                                >
+                                  Edit Name
+                                </button>
+                              )}
+                            </>
+                          )}
 
                           {performer.excludedFromResults && (
                             <span className="rounded-full border border-red-900/60 bg-red-950/40 px-2.5 py-1 text-xs font-medium text-red-400">
