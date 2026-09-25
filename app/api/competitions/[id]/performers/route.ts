@@ -263,7 +263,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
     // A single delete clears submitted and draft cards for every judge.
     // The performer was scoped to this competition above.
-    await db.orm.public.Scorecard.where({ performerId }).delete();
+    await db.orm.public.Scorecard.where({ performerId }).deleteAll();
 
     return NextResponse.json({ success: true });
   }
@@ -638,7 +638,7 @@ if (
 
   // Keep scorecard deletion, performer deletion, and lineup numbering atomic.
   const updatedPerformers = await db.transaction(async (tx) => {
-    await tx.orm.public.Scorecard.where({ performerId }).delete();
+    await tx.orm.public.Scorecard.where({ performerId }).deleteAll();
     await tx.orm.public.Performer.where({ id: performerId, competitionId }).delete();
 
     const remaining = await tx.orm.public.Performer.where({ competitionId }).all();
