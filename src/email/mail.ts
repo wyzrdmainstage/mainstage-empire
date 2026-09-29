@@ -4,27 +4,32 @@ import {
   buildJudgeInvitationEmail,
 } from "./login-email";
 
-const smtpHost = process.env.SMTP_HOST;
-const smtpPort = Number(process.env.SMTP_PORT);
-const smtpUser = process.env.SMTP_USER;
-const smtpPassword = process.env.SMTP_PASSWORD;
-const smtpFrom = process.env.SMTP_FROM;
+function getMailer() {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number(process.env.SMTP_PORT);
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPassword = process.env.SMTP_PASSWORD;
+  const smtpFrom = process.env.SMTP_FROM;
 
-if (!smtpHost || !smtpPort || !smtpUser || !smtpPassword || !smtpFrom) {
-  throw new Error("SMTP environment variables are not fully configured.");
+  if (!smtpHost || !smtpPort || !smtpUser || !smtpPassword || !smtpFrom) {
+    throw new Error("SMTP environment variables are not fully configured.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPassword,
+    },
+  });
+
+  return { transporter, smtpFrom };
 }
 
-const transporter = nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpPort === 465,
-  auth: {
-    user: smtpUser,
-    pass: smtpPassword,
-  },
-});
-
 export async function sendTestEmail(to: string) {
+  const { transporter, smtpFrom } = getMailer();
   await transporter.sendMail({
     from: smtpFrom,
     to,
@@ -44,6 +49,7 @@ export async function sendLoginEmail(
   to: string,
   loginUrl: string
 ) {
+  const { transporter, smtpFrom } = getMailer();
   const emailContent = buildLoginEmail(loginUrl);
 
   return transporter.sendMail({
@@ -60,6 +66,7 @@ export async function sendJudgeInvitationEmail(
   invitationUrl: string,
   competitionName: string
 ) {
+  const { transporter, smtpFrom } = getMailer();
   const emailContent = buildJudgeInvitationEmail(
     invitationUrl,
     competitionName
