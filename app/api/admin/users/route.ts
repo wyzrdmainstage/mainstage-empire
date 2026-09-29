@@ -1,11 +1,11 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireRole } from "@/src/auth/require-user";
 import {
   generateToken,
   hashToken,
 } from "@/src/auth";
 import { db } from "@/src/prisma/db";
-import nodemailer from "nodemailer";
+import { sendEmail } from "@/src/email/transport";
 import { normalizeEmail } from "@/src/utils/email";
 
 type UserRole = "ADMIN" | "ORGANIZER" | "JUDGE";
@@ -37,34 +37,6 @@ async function sendUserInvitationEmail(
   name: string,
   roles: UserRole[]
 ) {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = Number(process.env.SMTP_PORT);
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPassword = process.env.SMTP_PASSWORD;
-  const smtpFrom = process.env.SMTP_FROM;
-
-  if (
-    !smtpHost ||
-    !smtpPort ||
-    !smtpUser ||
-    !smtpPassword ||
-    !smtpFrom
-  ) {
-    throw new Error(
-      "SMTP environment variables are not fully configured."
-    );
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
-    auth: {
-      user: smtpUser,
-      pass: smtpPassword,
-    },
-  });
-
   const rolesText = roleLabels(roles);
 
   const subject = "You're invited to Mainstage Score";
@@ -124,8 +96,7 @@ Mainstage Empire`;
     </div>
   `;
 
-  return transporter.sendMail({
-    from: smtpFrom,
+  return sendEmail({
     to,
     subject,
     text,

@@ -5,7 +5,7 @@ import {
   generateToken,
   hashToken,
 } from "@/src/auth";
-import nodemailer from "nodemailer";
+import { sendEmail } from "@/src/email/transport";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -54,21 +54,7 @@ async function sendInvitationEmail({
 
   const rolesText = roleLabels(roles);
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 465),
-    secure:
-      Number(process.env.SMTP_PORT || 465) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-
-  await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      "Mainstage Empire <wyzrd@mainstageempire.com>",
+  await sendEmail({
     to: email,
     subject:
       "Your Mainstage Empire Score Invitation",

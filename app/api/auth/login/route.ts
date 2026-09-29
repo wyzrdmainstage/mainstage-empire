@@ -53,17 +53,12 @@ export async function POST(request: Request) {
     const loginUrl = `${baseUrl}/login?token=${encodeURIComponent(token)}`;
 
     try {
-      const emailInfo = await sendLoginEmail(
+      await sendLoginEmail(
         normalizedEmail,
         loginUrl
       );
 
-      console.log("LOGIN EMAIL SENT:", {
-        messageId: emailInfo.messageId,
-        accepted: emailInfo.accepted,
-        rejected: emailInfo.rejected,
-        response: emailInfo.response,
-      });
+      console.log("Login email accepted by email provider.");
     } catch (emailError) {
       console.error("LOGIN EMAIL SEND ERROR:", emailError);
 
