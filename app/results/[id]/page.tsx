@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/src/prisma/db";
+import { getCompetitionResultData } from "@/src/competition-result-data";
 import ShareResultsButton from "@/app/results/ShareResultsButton";
 import type { ReactNode } from "react";
 
@@ -251,28 +252,10 @@ if (competition.status === "CANCELED") {
     );
   }
 
-  const performers =
-    await db.orm.public.Performer.where({
-      competitionId,
-    }).all();
-
-  const eligiblePerformers =
-    performers.filter(
-      (performer) =>
-        !performer.excludedFromResults
-    );
-
-  const assignments =
-    await db.orm.public.CompetitionJudge.where({
-      competitionId,
-    }).all();
-
+  const { performers, assignments, tiebreaks, scorecardsByPerformer, participantsByTiebreak } =
+    await getCompetitionResultData(competitionId);
+  const eligiblePerformers = performers.filter((performer) => !performer.excludedFromResults);
   const eligibleAssignments = assignments.filter((assignment) => !assignment.excludedFromResults);
-
-  const tiebreaks =
-    await db.orm.public.Tiebreak.where({
-      competitionId,
-    }).all();
 
   const resolvedTiebreaks =
     tiebreaks.filter(
@@ -285,10 +268,7 @@ if (competition.status === "CANCELED") {
     await Promise.all(
       resolvedTiebreaks.map(
         async (tiebreak) => {
-          const participants =
-            await db.orm.public.TiebreakPerformer.where({
-              tiebreakId: tiebreak.id,
-            }).all();
+          const participants = participantsByTiebreak.get(tiebreak.id) ?? [];
 
           const eligibleIds =
             new Set(
@@ -337,18 +317,7 @@ if (competition.status === "CANCELED") {
   const results = await Promise.all(
     eligiblePerformers.map(
       async (performer) => {
-        const scorecards =
-          await Promise.all(
-            eligibleAssignments.map(
-              (assignment) =>
-                db.orm.public.Scorecard.first({
-                  performerId:
-                    performer.id,
-                  judgeAssignmentId:
-                    assignment.id,
-                })
-            )
-          );
+        const scorecards = scorecardsByPerformer.get(performer.id) ?? [];
 
         const submittedScorecards =
           scorecards.filter(

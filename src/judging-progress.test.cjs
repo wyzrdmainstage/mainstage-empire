@@ -29,12 +29,19 @@ function fixture({ roles = ['ORGANIZER'], signedIn = true } = {}) {
       { performerId: 4, judgeAssignmentId: 10, status: 'SUBMITTED' },
     ],
   };
+  let reads = 0;
+  const predicate = filter => typeof filter === 'function'
+    ? filter(new Proxy({}, { get: (_, key) => ({ in: values => row => values.includes(row[key]) }) }))
+    : row => Object.entries(filter).every(([key, value]) => row[key] === value);
   const table = name => {
-    const query = (filter = {}, fields) => ({
-      where: filter => query(filter, fields), select: (...fields) => query(filter, fields),
-      all: async () => rows[name].filter(row => Object.entries(filter).every(([k, v]) => row[k] === v))
-        .map(row => fields ? Object.fromEntries(fields.map(key => [key, row[key]])) : row),
-      first: async filterOverride => (await query(filterOverride ?? filter, fields).all())[0] ?? null,
+    const query = (filters = [], fields) => ({
+      where: filter => query([...filters, predicate(filter)], fields), select: (...fields) => query(filters, fields),
+      all: async () => {
+        reads++;
+        return rows[name].filter(row => filters.every(test => test(row)))
+          .map(row => fields ? Object.fromEntries(fields.map(key => [key, row[key]])) : row);
+      },
+      first: async filter => (await query(filter ? [...filters, predicate(filter)] : filters, fields).all())[0] ?? null,
     });
     return query();
   };
@@ -46,8 +53,19 @@ function fixture({ roles = ['ORGANIZER'], signedIn = true } = {}) {
     'next/headers': { cookies: async () => ({ get: () => ({ value: 'session' }) }) },
     'next/server': { NextResponse: { json: (data, options = {}) => ({ data, status: options.status ?? 200, headers: options.headers }) } },
   });
-  return { rows, progress: () => helper.getJudgingProgress(1), get: (id = '1') => route.GET({}, { params: Promise.resolve({ id }) }) };
+  return { rows, reads: () => reads, progress: () => helper.getJudgingProgress(1), get: (id = '1') => route.GET({}, { params: Promise.resolve({ id }) }) };
 }
+
+test('progress uses four reads even for a large panel of judges', async () => {
+  const f = fixture();
+  for (let i = 30; i < 130; i++) {
+    f.rows.CompetitionJudge.push({ id: i, competitionId: 1, judgeId: i, excludedFromResults: false });
+    f.rows.User.push({ id: i, name: `Judge ${i}` });
+  }
+  const data = await f.progress();
+  assert.equal(data.judges.length, 102);
+  assert.equal(f.reads(), 4);
+});
 
 test('progress counts only submitted cards in this lineup, excluding judges excluded from totals', async () => {
   const f = fixture();

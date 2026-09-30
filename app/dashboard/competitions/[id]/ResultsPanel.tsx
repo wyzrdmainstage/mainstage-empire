@@ -1,4 +1,4 @@
-﻿import { db } from "@/src/prisma/db";
+﻿import { getCompetitionResultData } from "@/src/competition-result-data";
 
 import ScoresheetActions from "@/app/results/ScoresheetActions";
 
@@ -39,45 +39,9 @@ export default async function ResultsPanel({
     );
   }
 
-  const performers =
-    await db.orm.public.Performer.where({
-      competitionId,
-    }).all();
-
-  /*
-   * Excluded performers remain in the database so their
-   * scorecards and judging history are preserved, but they
-   * are removed from official results and placement calculations.
-   */
-  const eligiblePerformers =
-    performers.filter(
-      (performer) =>
-        !performer.excludedFromResults
-    );
-
-  const assignments =
-    await db.orm.public.CompetitionJudge.where({
-      competitionId,
-    }).all();
-
-  /*
-   * Judges excluded from results retain all of their
-   * scorecards in the database, but their scores do not
-   * contribute to official results.
-   */
-  const eligibleAssignments =
-    assignments.filter(
-      (assignment) =>
-        !assignment.excludedFromResults
-    );
-
-  /*
-   * Load all tiebreaks for this competition.
-   */
-  const tiebreaks =
-    await db.orm.public.Tiebreak.where({
-      competitionId,
-    }).all();
+  const { performers, tiebreaks, scorecardsByPerformer, participantsByTiebreak } =
+    await getCompetitionResultData(competitionId);
+  const eligiblePerformers = performers.filter((performer) => !performer.excludedFromResults);
 
   const resolvedTiebreaks =
     tiebreaks.filter(
@@ -97,10 +61,7 @@ export default async function ResultsPanel({
     await Promise.all(
       resolvedTiebreaks.map(
         async (tiebreak) => {
-          const participants =
-            await db.orm.public.TiebreakPerformer.where({
-              tiebreakId: tiebreak.id,
-            }).all();
+          const participants = participantsByTiebreak.get(tiebreak.id) ?? [];
 
           const eligibleIds =
             new Set(
@@ -165,18 +126,7 @@ export default async function ResultsPanel({
   const results = await Promise.all(
     eligiblePerformers.map(
       async (performer) => {
-        const scorecards =
-          await Promise.all(
-            eligibleAssignments.map(
-              (assignment) =>
-                db.orm.public.Scorecard.first({
-                  performerId:
-                    performer.id,
-                  judgeAssignmentId:
-                    assignment.id,
-                })
-            )
-          );
+        const scorecards = scorecardsByPerformer.get(performer.id) ?? [];
 
         const submittedScorecards =
           scorecards.filter(
