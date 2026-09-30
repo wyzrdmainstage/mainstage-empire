@@ -1,4 +1,5 @@
 import StatusManager from "./StatusManager";
+import LiveJudgingProgress from "./LiveJudgingProgress";
 import ResultsPanel from "./ResultsPanel";
 import ShareResultsButton from "@/app/results/ShareResultsButton";
 import TiebreakPanel from "./TiebreakPanel";
@@ -287,41 +288,6 @@ const isLocked =
         competitionId,
       }).all();
 
-    const scorecards = (
-      await Promise.all(
-        performers.map((performer) =>
-          db.orm.public.Scorecard.where({
-            performerId: performer.id,
-          }).all()
-        )
-      )
-    ).flat();
-
-    const activeJudges =
-      judges.filter(
-        (judge) =>
-          !judge.excludedFromResults
-      );
-
-    const activeJudgeAssignmentIds =
-      new Set(
-        activeJudges.map(
-          (judge) => judge.id
-        )
-      );
-
-    const submittedScorecards =
-      scorecards.filter(
-        (scorecard) =>
-          scorecard.status === "SUBMITTED" &&
-          activeJudgeAssignmentIds.has(
-            scorecard.judgeAssignmentId
-          )
-      ).length;
-
-    const totalExpectedScorecards =
-      performers.length * activeJudges.length;
-
     return (
       <main className="min-h-screen bg-black text-white">
         <div className="mx-auto max-w-6xl px-6 py-10">
@@ -514,37 +480,7 @@ const isLocked =
               </div>
             </div>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-              <p className="text-sm font-semibold uppercase tracking-wider text-amber-400">
-                Judging Progress
-              </p>
-
-              <h2 className="mt-2 text-2xl font-semibold text-white">
-                {submittedScorecards} /{" "}
-                {totalExpectedScorecards}
-              </h2>
-
-              <p className="mt-2 text-sm text-zinc-400">
-                Submitted scorecards
-              </p>
-
-              <div className="mt-6 h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div
-                  className="h-full bg-amber-400 transition-all"
-                  style={{
-                    width:
-                      totalExpectedScorecards > 0
-                        ? `${Math.min(
-                            100,
-                            (submittedScorecards /
-                              totalExpectedScorecards) *
-                              100
-                          )}%`
-                        : "0%",
-                  }}
-                />
-              </div>
-            </div>
+            <LiveJudgingProgress key={competitionId} competitionId={competitionId} />
 
             {competition.status ===
               "JUDGING_COMPLETE" && (
