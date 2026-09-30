@@ -172,6 +172,9 @@ if (competition.status === "CANCELED") {
             </div>
           ) : (
             <ScorecardForm
+              key={`${assignment.id}:${performer.id}:${existingScorecard?.updatedAt ?? "new"}`}
+              judgeAssignmentId={assignment.id}
+              revision={existingScorecard ? `${existingScorecard.id}:${existingScorecard.updatedAt}` : "new"}
               competitionId={competitionId}
               performerId={performer.id}
               existingScorecard={existingScorecard}

@@ -131,16 +131,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (competition.status !== "LIVE") {
-      return NextResponse.json(
-        {
-          error:
-            "Scorecards can only be submitted while the competition is live.",
-        },
-        { status: 400 }
-      );
-    }
-
     const performer =
       await db.orm.public.Performer.first({
         id: performerId,
@@ -160,7 +150,12 @@ export async function POST(request: Request) {
         judgeAssignmentId: assignment.id,
       });
 
-    if (existingScorecard?.status === "SUBMITTED") {
+    function submissionReceipt(card: typeof existingScorecard) {
+      if (card?.status !== "SUBMITTED") return null;
+      if (scoreFields.every((field) => card[field] === scores[field]) &&
+          (card.notes ?? "").trim() === (notes ?? "")) {
+        return NextResponse.json({ success: true, message: "Scorecard submission confirmed." });
+      }
       return NextResponse.json(
         {
           error:
@@ -170,38 +165,52 @@ export async function POST(request: Request) {
       );
     }
 
-    const now = new Date().toISOString();
+    // A lost response can be retried even after judging closes. Never change
+    // an already submitted card, and only acknowledge matching contents.
+    const receipt = submissionReceipt(existingScorecard);
+    if (receipt) return receipt;
 
-    if (existingScorecard) {
-      await db.orm.public.Scorecard
-        .where({ id: existingScorecard.id })
-        .update({
-          presentation: scores.presentation,
-          vocals: scores.vocals,
-          lyrics: scores.lyrics,
-          energy: scores.energy,
-          quality: scores.quality,
-          starFactor: scores.starFactor,
-          notes,
-          status: "SUBMITTED",
-          submittedAt: now,
-          updatedAt: now,
+    if (competition.status !== "LIVE") {
+      return NextResponse.json(
+        { error: "Scorecards can only be submitted while the competition is live." },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    const submission = {
+      ...scores,
+      notes,
+      status: "SUBMITTED" as const,
+      submittedAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      if (existingScorecard) {
+        const updated = await db.orm.public.Scorecard
+          .where({ id: existingScorecard.id, status: "DRAFT" })
+          .update(submission);
+        if (!updated) {
+          const current = await db.orm.public.Scorecard.first({ performerId, judgeAssignmentId: assignment.id });
+          return submissionReceipt(current) ?? NextResponse.json(
+            { error: "This scorecard changed. Refresh the page before submitting." }, { status: 409 }
+          );
+        }
+      } else {
+        await db.orm.public.Scorecard.create({
+          performerId,
+          judgeAssignmentId: assignment.id,
+          ...submission,
         });
-    } else {
-      await db.orm.public.Scorecard.create({
-        performerId,
-        judgeAssignmentId: assignment.id,
-        presentation: scores.presentation,
-        vocals: scores.vocals,
-        lyrics: scores.lyrics,
-        energy: scores.energy,
-        quality: scores.quality,
-        starFactor: scores.starFactor,
-        notes,
-        status: "SUBMITTED",
-        submittedAt: now,
-        updatedAt: now,
-      });
+      }
+    } catch (writeError) {
+      // The unique performer/assignment constraint decides concurrent creates.
+      // Re-read after a competing request (or an uncertain write response).
+      const current = await db.orm.public.Scorecard.first({ performerId, judgeAssignmentId: assignment.id });
+      const receipt = submissionReceipt(current);
+      if (receipt) return receipt;
+      throw writeError;
     }
 
     return NextResponse.json({

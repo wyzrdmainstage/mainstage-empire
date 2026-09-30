@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { draftKey, readDraft, writeDraft, type Scores } from "@/src/scorecard-draft";
 
 type Scorecard = {
   id: number;
@@ -16,6 +17,8 @@ type Scorecard = {
 };
 
 type ScorecardFormProps = {
+  judgeAssignmentId: number;
+  revision: string;
   competitionId: number;
   performerId: number;
   existingScorecard: Scorecard | null;
@@ -64,12 +67,20 @@ const categories = [
 type CategoryKey = (typeof categories)[number]["key"];
 
 export default function ScorecardForm({
+  judgeAssignmentId,
+  revision,
   competitionId,
   performerId,
   existingScorecard,
   excludedFromResults,
 }: ScorecardFormProps) {
+  const storageKey = draftKey(judgeAssignmentId, performerId, revision);
   const router = useRouter();
+  const inFlight = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [draftMessage, setDraftMessage] = useState("");
+  const [offline, setOffline] = useState(false);
+  const [retry, setRetry] = useState(false);
 
   const [scores, setScores] = useState<
     Record<CategoryKey, number | null>
@@ -89,6 +100,41 @@ export default function ScorecardForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    // Hydrate browser-only storage after SSR, before enabling any edits.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    try {
+      const draft = readDraft(localStorage.getItem(storageKey));
+      if (draft && !excludedFromResults) {
+        setScores(draft.scores);
+        setNotes(draft.notes);
+        setDraftMessage("Draft restored from this browser. It has not been submitted.");
+      }
+    } catch {
+      setDraftMessage("Draft saving is unavailable in this browser. Keep this page open until you submit.");
+    }
+    setReady(true);
+    setOffline(!navigator.onLine);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    const online = () => setOffline(false);
+    const offline = () => setOffline(true);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    return () => {
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+    };
+  }, [storageKey, excludedFromResults]);
+
+  function saveDraft(nextScores: Scores, nextNotes: string) {
+    try {
+      writeDraft(localStorage, storageKey, nextScores, nextNotes);
+      setDraftMessage("Draft saved in this browser for 24 hours. Not yet submitted.");
+    } catch {
+      setDraftMessage("Could not save your draft. Keep this page open until you submit.");
+    }
+  }
+
   const total = useMemo(() => {
   return Object.values(scores).reduce<number>(
     (sum, score) => sum + (score ?? 0),
@@ -104,17 +150,20 @@ export default function ScorecardForm({
     category: CategoryKey,
     score: number
   ) {
-    if (excludedFromResults) {
+    if (excludedFromResults || !ready || inFlight.current) {
       return;
     }
 
-    setScores((current) => ({
-      ...current,
+    const nextScores = {
+      ...scores,
       [category]: score,
-    }));
+    };
+    setScores(nextScores);
+    saveDraft(nextScores, notes);
   }
 
-    async function handleSubmit() {
+  async function handleSubmit() {
+    if (!ready || inFlight.current) return;
     if (excludedFromResults) {
       setError(
         "You have been excluded from this competition's results and cannot submit scorecards."
@@ -135,14 +184,19 @@ export default function ScorecardForm({
       return;
     }
 
+    inFlight.current = true;
     setSubmitting(true);
     setError("");
+    saveDraft(scores, notes);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
 
     try {
       const response = await fetch(
         "/api/scorecards",
         {
           method: "POST",
+          signal: controller.signal,
           headers: {
             "Content-Type": "application/json",
           },
@@ -162,18 +216,23 @@ export default function ScorecardForm({
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || data.success !== true) {
+        setRetry(true);
         setError(
           data.error ?? "Unable to submit scorecard."
         );
         return;
       }
 
-      window.location.href =
-        `/dashboard/competitions/${competitionId}?view=judge`;
+      try { localStorage.removeItem(storageKey); } catch { /* Submission is already confirmed. */ }
+      router.push(`/dashboard/competitions/${competitionId}?view=judge`);
+      router.refresh();
     } catch {
-      setError("Unable to connect to the server.");
+      setRetry(true);
+      setError("We could not confirm your submission. Your entries are still here. Reconnect and retry; scores already received will not be submitted twice.");
     } finally {
+      window.clearTimeout(timeout);
+      inFlight.current = false;
       setSubmitting(false);
     }
   }
@@ -191,7 +250,7 @@ export default function ScorecardForm({
           </h2>
 
           <p className="mt-3 leading-7 text-zinc-400">
-            You have been excluded from this competition's official results.
+            You have been excluded from this competition&apos;s official results.
             Your previous scorecards have been retained, but you cannot
             submit or modify scores while excluded.
           </p>
@@ -218,6 +277,10 @@ export default function ScorecardForm({
         </p>
       </div>
 
+      <p role="status" className="text-sm text-amber-300">
+        {!ready ? "Restoring draft…" : draftMessage || "Unfinished scores are saved in this browser as you work."}
+      </p>
+      {offline && <p role="status" className="text-sm text-amber-300">You appear to be offline. You can keep scoring; reconnect before submitting.</p>}
       <div className="space-y-5">
         {categories.map((category) => (
           <div
@@ -244,6 +307,7 @@ export default function ScorecardForm({
                   <button
                     key={score}
                     type="button"
+                    disabled={!ready || submitting}
                     onClick={() =>
                       selectScore(category.key, score)
                     }
@@ -298,9 +362,11 @@ export default function ScorecardForm({
         <textarea
           id="notes"
           value={notes}
-          onChange={(event) =>
-            setNotes(event.target.value)
-          }
+          disabled={!ready || submitting}
+          onChange={(event) => {
+            setNotes(event.target.value);
+            saveDraft(scores, event.target.value);
+          }}
           rows={6}
           placeholder="Enter your notes..."
           className="mt-4 w-full resize-y rounded-lg border border-zinc-700 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-amber-400"
@@ -308,7 +374,7 @@ export default function ScorecardForm({
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-900 bg-red-950/30 p-4 text-sm text-red-400">
+        <div role="alert" className="rounded-lg border border-red-900 bg-red-950/30 p-4 text-sm text-red-400">
           {error}
         </div>
       )}
@@ -316,12 +382,12 @@ export default function ScorecardForm({
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={submitting || !allScored}
+        disabled={!ready || submitting || !allScored}
         className="w-full rounded-lg bg-amber-400 px-6 py-4 text-lg font-semibold text-black transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting
           ? "Submitting..."
-          : "Submit Scorecard"}
+          : retry ? "Retry Submission" : "Submit Scorecard"}
       </button>
 
       <p className="text-center text-xs text-zinc-600">
