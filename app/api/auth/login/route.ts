@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
-import { generateToken, hashToken } from "@/src/auth";
+import { LOGIN_LINK_MESSAGE, reserveLoginToken } from "@/src/login-token";
 import { sendLoginEmail } from "@/src/email/mail";
 import { normalizeEmail } from "@/src/utils/email";
 
 export async function POST(request: Request) {
 
   try {
-    const { email } = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+    }
+    const email = body && typeof body === "object" && "email" in body
+      ? body.email : undefined;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json(
@@ -17,6 +24,9 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = normalizeEmail(email);
+    if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+    }
 
     const user = await db.orm.public.User.first({
       email: normalizedEmail,
@@ -29,28 +39,19 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({
         success: true,
-        message:
-          "If that email is authorized, a login link has been sent.",
+        message: LOGIN_LINK_MESSAGE,
       });
     }
 
-    const token = generateToken();
-    const tokenHash = hashToken(token);
-
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    const tokenRecord = await db.orm.public.AuthToken.create({
-      userId: user.id,
-      type: "LOGIN",
-      tokenHash,
-      expiresAt: expiresAt.toISOString(),
-    });
+    const tokenRecord = await reserveLoginToken(user.id);
+    if (!tokenRecord) {
+      return NextResponse.json({ success: true, message: LOGIN_LINK_MESSAGE });
+    }
 
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-    const loginUrl = `${baseUrl}/login?token=${encodeURIComponent(token)}`;
+    const loginUrl = `${baseUrl}/login?token=${encodeURIComponent(tokenRecord.token)}`;
 
     try {
       await sendLoginEmail(
@@ -71,8 +72,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message:
-        "If that email is authorized, a login link has been sent.",
+      message: LOGIN_LINK_MESSAGE,
     });
   } catch (error) {
     console.error("Login request error:", error);
