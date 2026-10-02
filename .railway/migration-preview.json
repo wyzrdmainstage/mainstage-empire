@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-01T06:51:34.6925660Z",
+  "cliVersion": "5.63.1",
+  "environment": {
+    "projectId": "3ce785f4-3392-461b-94d3-624069afecbc",
+    "projectName": "Mainstage Score",
+    "environmentId": "30689fa0-1329-4eb0-8f79-6ee6336f4e6f",
+    "environmentName": "production",
+    "configEtag": "18996e8cd30c3c23831455024bf2978dd009cf91ca3c517d61c2e386019cb17c"
+  },
+  "changes": [
+    {
+      "summary": "Update mainstage-score build.buildCommand",
+      "severity": "safe",
+      "kind": "resource.update",
+      "details": [
+        "build.buildCommand (null → \"npm run build\")"
+      ]
+    },
+    {
+      "summary": "Update mainstage-score deploy.healthcheckPath, deploy.healthcheckTimeout, deploy.restartPolicyMaxRetries and 2 more",
+      "severity": "safe",
+      "kind": "resource.update",
+      "details": [
+        "deploy.healthcheckPath (null → \"/api/health\")",
+        "deploy.healthcheckTimeout (null → 120)",
+        "deploy.restartPolicyMaxRetries (null → 10)",
+        "deploy.restartPolicyType (null → \"ON_FAILURE\")",
+        "deploy.startCommand (null → \"npm run start -- --hostname 0.0.0.0\")"
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "applied": false
+}
