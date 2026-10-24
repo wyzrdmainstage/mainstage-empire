@@ -56,6 +56,17 @@ export default async function PerformersPage({
     })
   );
 
+  const assignments = await db.orm.public.CompetitionJudge.where({ competitionId }).all();
+  const judges = await Promise.all(assignments.map(async (assignment) => {
+    const judge = await db.orm.public.User.first({ id: assignment.judgeId });
+    return { assignmentId: assignment.id, name: judge?.name || judge?.email || "Unnamed judge" };
+  }));
+  const submittedCards = await db.orm.public.Scorecard.where({ status: "SUBMITTED" }).all();
+  const submittedByPerformer = submittedCards.filter((card) =>
+    sortedPerformers.some((performer) => performer.id === card.performerId) &&
+    assignments.some((assignment) => assignment.id === card.judgeAssignmentId)
+  ).map((card) => ({ performerId: card.performerId, assignmentId: card.judgeAssignmentId }));
+
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -99,6 +110,8 @@ export default async function PerformersPage({
             competitionStatus={competition.status}
             performers={performersWithLockStatus}
             isAdmin={user.roles.includes("ADMIN")}
+            judges={judges}
+            submittedCards={submittedByPerformer}
           />
         </section>
       </div>
