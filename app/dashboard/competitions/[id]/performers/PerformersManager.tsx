@@ -18,6 +18,8 @@ type PerformersManagerProps = {
   competitionStatus: string;
   performers: Performer[];
   isAdmin: boolean;
+  judges: { assignmentId: number; name: string }[];
+  submittedCards: { performerId: number; assignmentId: number }[];
 };
 
 export default function PerformersManager({
@@ -25,6 +27,8 @@ export default function PerformersManager({
   competitionStatus,
   performers,
   isAdmin,
+  judges,
+  submittedCards,
 }: PerformersManagerProps) {
   const router = useRouter();
 
@@ -41,8 +45,35 @@ export default function PerformersManager({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [resetMessage, setResetMessage] = useState("");
+  const [resetJudgeSelections, setResetJudgeSelections] = useState<Record<number, string>>({});
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  async function resetJudgeScore(performer: Performer) {
+    const assignmentId = Number(resetJudgeSelections[performer.id]);
+    const judge = judges.find((item) => item.assignmentId === assignmentId);
+    if (!judge || saving || competitionStatus !== "LIVE") return;
+    if (!window.confirm(`Reset only ${judge.name}'s score for "${performer.artistName}"? Their submitted scores and feedback for this performer will be deleted. Other scores are untouched. This cannot be undone.`)) return;
+    setError("");
+    setResetMessage("");
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/competitions/${competitionId}/performers`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resetJudgeScore", performerId: performer.id, judgeAssignmentId: assignmentId, confirmReset: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) { setError(data.error || "Unable to reset judge score."); return; }
+      setResetJudgeSelections((current) => ({ ...current, [performer.id]: "" }));
+      setResetMessage(`${judge.name}'s score for "${performer.artistName}" was reset. Ask the judge to refresh and score again.`);
+      router.refresh();
+    } catch {
+      setError("Unable to confirm the reset. Refresh before trying again.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function resetScores(performer: Performer) {
     if (saving || competitionStatus !== "LIVE") return;
@@ -918,6 +949,27 @@ if (!performer || changesLocked || saving) {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      {competitionStatus === "LIVE" && submittedCards.some((card) => card.performerId === performer.id) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            aria-label={`Judge to reset for ${performer.artistName}`}
+                            value={resetJudgeSelections[performer.id] || ""}
+                            onChange={(event) => setResetJudgeSelections((current) => ({ ...current, [performer.id]: event.target.value }))}
+                            disabled={saving}
+                            className="rounded-lg border border-zinc-700 bg-black px-3 py-2 text-sm text-white"
+                          >
+                            <option value="">Select judge</option>
+                            {judges.filter((judge) => submittedCards.some((card) => card.performerId === performer.id && card.assignmentId === judge.assignmentId)).map((judge) => (
+                              <option key={judge.assignmentId} value={judge.assignmentId}>{judge.name}</option>
+                            ))}
+                          </select>
+                          <button type="button" onClick={() => resetJudgeScore(performer)}
+                            disabled={saving || !resetJudgeSelections[performer.id]}
+                            className="rounded-lg border border-amber-700 px-4 py-2 text-sm font-medium text-amber-400 disabled:opacity-40">
+                            Reset Judge Score
+                          </button>
+                        </div>
+                      )}
                       {competitionStatus === "LIVE" && locked && (
                         <button
                           type="button"
