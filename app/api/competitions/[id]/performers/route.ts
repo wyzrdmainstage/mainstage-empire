@@ -203,6 +203,7 @@ export async function PATCH(request: Request, { params }: Params) {
     songCount?: number | null;
     supporterCount?: number;
     confirmReset?: boolean;
+    judgeAssignmentId?: number;
   };
 
   try {
@@ -236,6 +237,26 @@ export async function PATCH(request: Request, { params }: Params) {
       { error: "Performer not found." },
       { status: 404 }
     );
+  }
+
+  if (action === "resetJudgeScore") {
+    if (competition.status !== "LIVE") {
+      return NextResponse.json({ error: "Reopen judging before resetting a judge's score." }, { status: 409 });
+    }
+    const assignmentId = Number(body.judgeAssignmentId);
+    if (!Number.isInteger(assignmentId) || assignmentId <= 0 || body.confirmReset !== true) {
+      return NextResponse.json({ error: "A judge and reset confirmation are required." }, { status: 400 });
+    }
+    const assignment = await db.orm.public.CompetitionJudge.first({ id: assignmentId, competitionId });
+    if (!assignment) return NextResponse.json({ error: "Judge is not assigned to this competition." }, { status: 404 });
+    const tiebreak = await db.orm.public.Tiebreak.first({ competitionId });
+    if (tiebreak) return NextResponse.json({ error: "Scores cannot be reset after tiebreak activity has started." }, { status: 409 });
+    const card = await db.orm.public.Scorecard.first({ performerId, judgeAssignmentId: assignmentId });
+    if (!card || card.status !== "SUBMITTED") {
+      return NextResponse.json({ error: "This judge has no submitted score for this performer." }, { status: 409 });
+    }
+    await db.orm.public.Scorecard.where({ id: card.id, performerId, judgeAssignmentId: assignmentId }).delete();
+    return NextResponse.json({ success: true });
   }
 
   if (action === "resetScores") {
